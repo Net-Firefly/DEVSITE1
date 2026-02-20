@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Background -->
+  <rect width="64" height="64" fill="#0a0a0a" rx="4"/>
+  
+  <!-- Gold circle -->
+  <circle cx="32" cy="32" r="28" fill="none" stroke="#d4af37" stroke-width="2"/>
+  
+  <!-- Scissors icon -->
+  <g transform="translate(32, 32)">
+    <path d="M -8 -6 Q -12 -10 -14 -8 Q -16 -6 -12 -2 L 0 8" fill="none" stroke="#d4af37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 8 -6 Q 12 -10 14 -8 Q 16 -6 12 -2 L 0 8" fill="none" stroke="#d4af37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="-10" cy="-4" r="2" fill="#d4af37"/>
+    <circle cx="10" cy="-4" r="2" fill="#d4af37"/>
+  </g>
+</svg>
