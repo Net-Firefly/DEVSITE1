@@ -18,6 +18,8 @@ app.use(cors());
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2022-11-15' });
 
 const PORT = process.env.PORT || 5000;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 // M-Pesa Daraja API credentials (from environment variables)
 const CONSUMER_KEY = process.env.MPESA_CONSUMER_KEY || 'YOUR_CONSUMER_KEY';
@@ -198,6 +200,76 @@ function formatPhoneNumber(phone) {
 
   return null; // Invalid format
 }
+
+/**
+ * KAI chat endpoint (site-specific OpenAI assistant)
+ */
+app.post('/api/kai-chat', async (req, res) => {
+  try {
+    const { message, history } = req.body || {};
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ success: false, message: 'Message is required' });
+    }
+
+    if (!OPENAI_API_KEY) {
+      return res.status(503).json({
+        success: false,
+        message: 'KAI AI is not configured on the server. Set OPENAI_API_KEY in server/.env',
+      });
+    }
+
+    const safeHistory = Array.isArray(history)
+      ? history
+        .slice(-12)
+        .filter((item) => item && (item.role === 'user' || item.role === 'assistant') && typeof item.content === 'string')
+        .map((item) => ({ role: item.role, content: item.content }))
+      : [];
+
+    const systemPrompt = [
+      'You are Kai, the official AI assistant for Tripple Kay Cutts & Spa in Nairobi.',
+      'Your role: help customers with bookings, services, pricing, opening hours, contact details, and basic grooming guidance for this salon only.',
+      'Business context: Hours are Mon-Fri 9:00 AM-6:00 PM, Sat 10:00 AM-5:00 PM, closed Sunday.',
+      'Services include barbering and nails/spa. Typical pricing guide: haircuts about 4,550-9,750 KES, nails about 3,900-12,350 KES.',
+      'If asked to book, guide them to the site booking flow and suggest visiting the Services page.',
+      'Be concise, warm, and professional. Keep replies around 2-4 short sentences.',
+      'Do not invent policies or unavailable services; if unsure, suggest contacting the shop for confirmation.',
+    ].join(' ');
+
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: OPENAI_MODEL,
+        temperature: 0.4,
+        max_tokens: 220,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...safeHistory,
+          { role: 'user', content: message },
+        ],
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
+      }
+    );
+
+    const text = response.data?.choices?.[0]?.message?.content?.trim();
+    if (!text) {
+      return res.status(502).json({ success: false, message: 'No AI response returned' });
+    }
+
+    return res.json({ success: true, text });
+  } catch (error) {
+    console.error('KAI chat error:', error.response?.data || error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'KAI could not respond right now. Please try again shortly.',
+    });
+  }
+});
 
 /**
  * Send SMS notification to user
@@ -683,6 +755,7 @@ app.listen(PORT, () => {
 ═══════════════════════════════════════════════════════════════
 
   API Endpoints:
+  - POST /api/kai-chat                    : Site-specific KAI assistant (OpenAI)
   - POST /api/mpesa-initiate              : Initiate M-Pesa payment
   - POST /api/mpesa-query                 : Query payment status
   - POST /api/mpesa-callback              : Payment callback (Safaricom)

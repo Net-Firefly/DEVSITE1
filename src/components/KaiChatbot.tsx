@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { MessageCircle, Send, X, Minimize2, Maximize2, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { SERVER_BASE_URL } from "@/lib/api";
 
 interface Message {
   id: string;
@@ -76,10 +77,8 @@ const KaiChatbot = () => {
     },
   };
 
-  // Call OpenAI API if key available, else fall back to keyword matching
+  // Call backend KAI API first, else fall back to keyword matching
   const getAIResponse = async (userInput: string): Promise<{ text: string; suggestions?: Message["suggestions"] }> => {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-
     const toneRepairKeywords = [
       "rude",
       "mean",
@@ -107,38 +106,28 @@ const KaiChatbot = () => {
       };
     }
 
-    // Try OpenAI first
-    if (apiKey) {
+    // Try server-side AI first
+    if (SERVER_BASE_URL) {
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        const response = await fetch(`${SERVER_BASE_URL}/api/kai-chat`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: "gpt-3.5-turbo",
-            messages: [
-              {
-                role: "system",
-                content: `You are Kai, a warm, respectful barber shop assistant for Tripple Kay Cutts & Spa in Nairobi. Be calm, polite, and professional at all times. Never be rude, sarcastic, or dismissive, even if the user is upset. If the user seems frustrated, apologize briefly and refocus on how you can help. Keep responses concise (2-3 sentences). You can help with: booking appointments, explaining services (haircuts 4,550-9,750 KES, nails 3,900-12,350 KES), grooming tips, pricing, hours (Mon-Fri 9AM-6PM, Sat 10AM-5PM, Closed Sun), team info, and contact. Use friendly emojis sparingly.`,
-              },
-              ...messages
-                .filter((m) => m.sender !== undefined)
-                .map((m) => ({
-                  role: m.sender === "user" ? "user" : "assistant",
-                  content: m.text,
-                })),
-              { role: "user", content: userInput },
-            ],
-            temperature: 0.4,
-            max_tokens: 150,
+            message: userInput,
+            history: messages
+              .slice(-12)
+              .map((m) => ({
+                role: m.sender === "user" ? "user" : "assistant",
+                content: m.text,
+              })),
           }),
         });
 
         if (response.ok) {
           const data = await response.json();
-          const text = data.choices[0]?.message?.content || "I'm having trouble responding right now. Try again?";
+          const text = data?.text || "I'm having trouble responding right now. Try again?";
           return {
             text,
             suggestions: [
@@ -149,7 +138,7 @@ const KaiChatbot = () => {
           };
         }
       } catch (error) {
-        console.warn("OpenAI error, falling back to keyword matching:", error);
+        console.warn("KAI backend error, falling back to keyword matching:", error);
       }
     }
 

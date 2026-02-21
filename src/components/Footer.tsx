@@ -109,7 +109,7 @@ const Footer = () => {
               </div>
               <div className="flex items-center gap-3">
                 <Phone className="w-5 h-5 text-primary" />
-                <p className="font-body text-muted-foreground">(254) 723954633</p>
+                <p className="font-body text-muted-foreground">(+254) 726786668</p>
               </div>
             </div>
           </div>

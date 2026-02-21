@@ -98,10 +98,22 @@ NODE_ENV=production
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
+| POST | `/api/kai-chat` | Site-specific Kai AI assistant response |
 | POST | `/api/mpesa-initiate` | Initiate M-Pesa payment (STK Push) |
 | POST | `/api/mpesa-query` | Check payment status |
 | POST | `/api/mpesa-callback` | Receive payment confirmation from Safaricom |
 | GET | `/health` | Server health check |
+
+### Enable Kai AI (OpenAI)
+
+Add these values to `server/.env`:
+
+```env
+OPENAI_API_KEY=sk-your-openai-key-here
+OPENAI_MODEL=gpt-4o-mini
+```
+
+If `OPENAI_API_KEY` is missing, Kai in the frontend will automatically use its local keyword fallback mode.
 
 ## Troubleshooting
 
