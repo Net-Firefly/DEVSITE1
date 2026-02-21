@@ -102,9 +102,9 @@ const Footer = () => {
               <div className="flex items-start gap-3">
                 <MapPin className="w-5 h-5 text-primary mt-0.5" />
                 <p className="font-body text-muted-foreground">
-                  123 Urban Street<br />
-                  Downtown District<br />
-                  City, ST 12345
+                  Find us at:<br />
+                  Opposite Kenya Power<br />
+                  Bomet County, Kenya
                 </p>
               </div>
               <div className="flex items-center gap-3">
