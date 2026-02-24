@@ -71,6 +71,12 @@ const BookingForm = ({ isOpen, onClose, service }: BookingFormProps) => {
     cvv: "",
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentFeedback, setPaymentFeedback] = useState<{
+    type: "success" | "error" | "info";
+    title: string;
+    message: string;
+    details?: string[];
+  } | null>(null);
 
   // Stripe card processor component
   function CardPayment({ amount, name, email, phone, formData, service, onSuccess, onError }: { amount: number; name: string; email: string; phone: string; formData: any; service: any; onSuccess: (pi: any) => void; onError: (err: any) => void }) {
@@ -238,22 +244,44 @@ const BookingForm = ({ isOpen, onClose, service }: BookingFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPaymentFeedback(null);
 
     // Validate payment method selection
     if (!paymentMethod) {
-      alert("Please select a payment method");
+      setPaymentFeedback({
+        type: "info",
+        title: "Select payment method",
+        message: "Please select a payment method before continuing.",
+      });
       return;
     }
 
     // Validate payment details
     if (paymentMethod === "mpesa" && !mpesaData.mpesaPhone) {
-      alert("Please enter your M-Pesa phone number");
+      setPaymentFeedback({
+        type: "info",
+        title: "M-Pesa number required",
+        message: "Please enter your M-Pesa phone number.",
+      });
+      return;
+    }
+
+    if (paymentMethod === "mpesa" && !/^254\d{9}$/.test(mpesaData.mpesaPhone.replace(/\D/g, ""))) {
+      setPaymentFeedback({
+        type: "error",
+        title: "Invalid M-Pesa number",
+        message: "Use M-Pesa number format 254XXXXXXXXX (e.g., 254712345678).",
+      });
       return;
     }
 
     if (paymentMethod === "card") {
       // Card payments are handled via Stripe Elements using the Pay button in the Card section
-      alert("Please complete the payment using the 'Pay' button inside the Card payment section.");
+      setPaymentFeedback({
+        type: "info",
+        title: "Use card section",
+        message: "Please complete payment using the Pay button in the card section.",
+      });
       return;
     }
 
@@ -300,14 +328,36 @@ const BookingForm = ({ isOpen, onClose, service }: BookingFormProps) => {
           const data = await response.json();
 
           if (data.success) {
-            alert(`✓ M-Pesa Prompt Sent!\n\n${data.message}\n\nPhone: ${mpesaData.mpesaPhone}\nAmount: KES ${pricing.final.toLocaleString()}\nOrder ID: ${orderId}`);
-            handleClose();
+            setPaymentFeedback({
+              type: "success",
+              title: "M-Pesa prompt sent",
+              message: data.message || "Please enter your PIN on your phone to complete payment.",
+              details: [
+                `Phone: ${mpesaData.mpesaPhone}`,
+                `Amount: KES ${pricing.final.toLocaleString()}`,
+                `Order ID: ${orderId}`,
+              ],
+            });
           } else {
-            alert(`Payment Failed:\n\n${data.message}\n\nMake sure:\n1. Phone number is correct\n2. M-Pesa server is running\n3. Server credentials are configured`);
+            setPaymentFeedback({
+              type: "error",
+              title: "Payment failed",
+              message: data.message || "Could not initiate M-Pesa payment.",
+              details: [
+                "Confirm the phone number starts with 254.",
+                "Confirm the payment server is running.",
+                "Confirm Daraja credentials are configured.",
+              ],
+            });
           }
         } catch (err) {
           console.error('MPesa booking/initiate error', err);
-          alert('Failed to create booking or initiate M-Pesa. Check console for details.');
+          setPaymentFeedback({
+            type: "error",
+            title: "M-Pesa request failed",
+            message: "Failed to create booking or initiate M-Pesa.",
+            details: ["Check server logs for details."],
+          });
         }
       } else if (paymentMethod === "card") {
         // Card payment processing
@@ -315,12 +365,27 @@ const BookingForm = ({ isOpen, onClose, service }: BookingFormProps) => {
           ? `KES ${pricing.final.toLocaleString()} (was KES ${pricing.original.toLocaleString()})`
           : `KES ${pricing.original.toLocaleString()}`;
 
-        alert(`✓ Card Payment Processed!\n\nBooking confirmed for ${formData.name}!\n\nService: ${service?.name}\nDate: ${formData.date}\nTime: ${formData.time}\nTotal: ${totalAmount}\n\nPayment Method: Card\nCard ending in: ${cardData.cardNumber.slice(-4)}`);
-        handleClose();
+        setPaymentFeedback({
+          type: "success",
+          title: "Card payment processed",
+          message: `Booking confirmed for ${formData.name}.`,
+          details: [
+            `Service: ${service?.name}`,
+            `Date: ${formData.date}`,
+            `Time: ${formData.time}`,
+            `Total: ${totalAmount}`,
+            `Payment Method: Card`,
+          ],
+        });
       }
     } catch (error) {
       console.error("Payment error:", error);
-      alert(`Error processing payment:\n\n${error instanceof Error ? error.message : "Unknown error"}\n\nMake sure the payment server is running at ${SERVER_BASE_URL}`);
+      setPaymentFeedback({
+        type: "error",
+        title: "Payment error",
+        message: error instanceof Error ? error.message : "Unknown error",
+        details: [`Make sure the payment server is running at ${SERVER_BASE_URL}`],
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -345,6 +410,7 @@ const BookingForm = ({ isOpen, onClose, service }: BookingFormProps) => {
       expiryDate: "",
       cvv: "",
     });
+    setPaymentFeedback(null);
     setIsProcessing(false);
     onClose();
   };
@@ -548,12 +614,12 @@ const BookingForm = ({ isOpen, onClose, service }: BookingFormProps) => {
                         <Label htmlFor="mpesaPhone" className="font-body text-sm">M-Pesa Phone Number</Label>
                         <Input
                           id="mpesaPhone"
-                          placeholder="+254 7xx xxx xxx"
+                          placeholder="2547XXXXXXXX"
                           value={mpesaData.mpesaPhone}
                           onChange={(e) => setMpesaData({ mpesaPhone: e.target.value })}
                           className="font-body"
                         />
-                        <p className="text-xs text-muted-foreground">You will receive a prompt to complete the payment</p>
+                        <p className="text-xs text-muted-foreground">Use format 254XXXXXXXXX. You will receive a prompt to complete the payment</p>
                       </div>
                     </div>
                   )}
@@ -592,11 +658,22 @@ const BookingForm = ({ isOpen, onClose, service }: BookingFormProps) => {
                           formData={formData}
                           service={service}
                           onSuccess={(pi) => {
-                            alert(`✓ Payment successful!\n\nBooking confirmed for ${formData.name}.\nAmount: KES ${pricing.final.toLocaleString()}\nPayment ID: ${pi.id}`);
-                            handleClose();
+                            setPaymentFeedback({
+                              type: "success",
+                              title: "Payment successful",
+                              message: `Booking confirmed for ${formData.name}.`,
+                              details: [
+                                `Amount: KES ${pricing.final.toLocaleString()}`,
+                                `Payment ID: ${pi.id}`,
+                              ],
+                            });
                           }}
                           onError={(err) => {
-                            alert(`Payment failed: ${err?.message || 'Unknown error'}`);
+                            setPaymentFeedback({
+                              type: "error",
+                              title: "Payment failed",
+                              message: err?.message || 'Unknown error',
+                            });
                           }}
                         />
                       </Elements>
@@ -605,6 +682,27 @@ const BookingForm = ({ isOpen, onClose, service }: BookingFormProps) => {
                 </div>
               </div>
             </div>
+
+            {paymentFeedback && (
+              <div
+                className={`rounded-lg border p-3 text-sm ${paymentFeedback.type === "success"
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                  : paymentFeedback.type === "error"
+                    ? "border-red-500/40 bg-red-500/10 text-red-200"
+                    : "border-blue-500/40 bg-blue-500/10 text-blue-200"
+                  }`}
+              >
+                <p className="font-semibold">{paymentFeedback.title}</p>
+                <p className="mt-1">{paymentFeedback.message}</p>
+                {paymentFeedback.details && paymentFeedback.details.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {paymentFeedback.details.map((detail) => (
+                      <p key={detail}>• {detail}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Pricing Display */}
             {service && (

@@ -4,6 +4,7 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
 import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
@@ -12,6 +13,7 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 // Initialize Stripe
@@ -36,8 +38,14 @@ const QUERY_URL = 'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query';
 let accessToken = null;
 let tokenExpiry = null;
 
-// File-backed bookings storage (bookings.json)
-const BOOKINGS_FILE = path.resolve(process.cwd(), 'bookings.json');
+// Google Calendar config (optional)
+const GCALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || '';
+const GCALENDAR_ON_PAYMENT = String(process.env.GOOGLE_CALENDAR_ON_PAYMENT || 'false').toLowerCase() === 'true';
+
+// File-backed bookings storage (bookings.json in workspace root)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const BOOKINGS_FILE = path.resolve(__dirname, '..', 'bookings.json');
 
 function readBookingsFile() {
   try {
@@ -121,6 +129,19 @@ function updateBookingByOrderId(orderId, updates = {}) {
   return bookings[idx];
 }
 
+async function createCalendarEvent(booking) {
+  if (!GCALENDAR_ID) return null;
+  console.warn('[Calendar] GOOGLE_CALENDAR_ID is set but calendar event creation is not fully configured. Skipping event creation.');
+  return null;
+}
+
+function updateBookingCalendarEvent(orderId, event) {
+  return updateBookingByOrderId(orderId, {
+    calendar_event_id: event?.id || null,
+    calendar_event_link: event?.htmlLink || null,
+  });
+}
+
 // Email utility (nodemailer)
 async function sendEmail(to, subject, html) {
   try {
@@ -186,19 +207,11 @@ async function getAccessToken() {
  * Format phone number to international format (254XXXXXXXXX)
  */
 function formatPhoneNumber(phone) {
-  // Remove all non-digit characters
-  let cleaned = phone.replace(/\D/g, '');
-
-  // Handle different formats
-  if (cleaned.startsWith('254')) {
-    return cleaned; // Already in correct format
-  } else if (cleaned.startsWith('0')) {
-    return '254' + cleaned.slice(1); // Replace leading 0 with 254
-  } else if (cleaned.length === 9) {
-    return '254' + cleaned; // Assume it's missing country code
+  const cleaned = String(phone || '').replace(/\D/g, '');
+  if (/^254\d{9}$/.test(cleaned)) {
+    return cleaned;
   }
-
-  return null; // Invalid format
+  return null;
 }
 
 /**
@@ -316,101 +329,122 @@ async function sendSMS(phoneNumber, message) {
 /**
  * Initiate M-Pesa STK Push
  */
-app.post('/api/mpesa-initiate', async (req, res) => {
-  try {
-    const { phone, amount, orderId, email } = req.body;
-
-    // Validate input
-    if (!phone || !amount || !orderId) {
-      return res.status(400).json({
+async function initiateMpesaPayment({ phone, amount, orderId }) {
+  // Validate input
+  if (!phone || !amount || !orderId) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
         success: false,
         message: 'Phone number, amount, and order ID are required',
-      });
-    }
-
-    // Format phone number
-    const formattedPhone = formatPhoneNumber(phone);
-    if (!formattedPhone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid phone number format. Please use format like +254712345678 or 0712345678',
-      });
-    }
-
-    // Validate amount
-    const parsedAmount = parseInt(amount);
-    if (isNaN(parsedAmount) || parsedAmount < 10) {
-      return res.status(400).json({
-        success: false,
-        message: 'Amount must be at least 10 KES',
-      });
-    }
-
-    // Get access token
-    const token = await getAccessToken();
-
-    // Generate timestamp in format: YYYYMMDDHHmmss
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[-:T.Z]/g, '')
-      .slice(0, 14);
-
-    // Generate password: base64(SHORTCODE + PASSKEY + TIMESTAMP)
-    const password = Buffer.from(`${SHORTCODE}${PASSKEY}${timestamp}`).toString('base64');
-
-    // Prepare STK Push request
-    const payload = {
-      BusinessShortCode: SHORTCODE,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: 'CustomerPayBillOnline',
-      Amount: parsedAmount,
-      PartyA: formattedPhone,
-      PartyB: SHORTCODE,
-      PhoneNumber: formattedPhone,
-      CallBackURL: CALLBACK_URL,
-      AccountReference: orderId,
-      TransactionDesc: `Booking Payment - ${orderId}`,
-    };
-
-    // Send STK Push request
-    const response = await axios.post(STK_PUSH_URL, payload, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
       },
-    });
+    };
+  }
 
-    console.log('STK Push Response:', response.data);
+  // Format phone number
+  const formattedPhone = formatPhoneNumber(phone);
+  if (!formattedPhone) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        success: false,
+        message: 'Invalid phone number format. Use 254XXXXXXXXX (e.g., 254712345678).',
+      },
+    };
+  }
 
-    // Check response
-    if (response.data.ResponseCode === '0') {
-      // Update booking with checkout request id if booking exists
-      try {
-        const existing = getBookingByOrderId(orderId);
-        if (existing) {
-          updateBookingByOrderId(orderId, { checkout_request_id: response.data.CheckoutRequestID });
-        }
-      } catch (e) {
-        console.warn('Failed to update booking with checkout id:', e.message);
+  // Validate amount
+  const parsedAmount = parseInt(amount);
+  if (isNaN(parsedAmount) || parsedAmount < 1) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        success: false,
+        message: 'Amount must be at least 1 KES',
+      },
+    };
+  }
+
+  // Get access token
+  const token = await getAccessToken();
+
+  // Generate timestamp in format: YYYYMMDDHHmmss
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:T.Z]/g, '')
+    .slice(0, 14);
+
+  // Generate password: base64(SHORTCODE + PASSKEY + TIMESTAMP)
+  const password = Buffer.from(`${SHORTCODE}${PASSKEY}${timestamp}`).toString('base64');
+
+  // Prepare STK Push request
+  const payload = {
+    BusinessShortCode: SHORTCODE,
+    Password: password,
+    Timestamp: timestamp,
+    TransactionType: 'CustomerPayBillOnline',
+    Amount: parsedAmount,
+    PartyA: formattedPhone,
+    PartyB: SHORTCODE,
+    PhoneNumber: formattedPhone,
+    CallBackURL: CALLBACK_URL,
+    AccountReference: orderId,
+    TransactionDesc: `Booking Payment - ${orderId}`,
+  };
+
+  // Send STK Push request
+  const response = await axios.post(STK_PUSH_URL, payload, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  console.log('STK Push Response:', response.data);
+
+  if (response.data.ResponseCode === '0') {
+    try {
+      const existing = getBookingByOrderId(orderId);
+      if (existing) {
+        updateBookingByOrderId(orderId, { checkout_request_id: response.data.CheckoutRequestID });
       }
+    } catch (e) {
+      console.warn('Failed to update booking with checkout id:', e.message);
+    }
 
-      // Send SMS notification to user asynchronously (don't wait for it)
-      const smsMessage = `Hi! Your M-Pesa payment prompt has been sent. Please enter your PIN to pay KES ${parsedAmount} for your Tripple Kay Cuts booking. Reference: ${orderId}`;
-      sendSMS(formattedPhone, smsMessage).catch(err => console.warn('SMS notification failed:', err));
+    const smsMessage = `Hi! Your M-Pesa payment prompt has been sent. Please enter your PIN to pay KES ${parsedAmount} for your Tripple Kay Cuts booking. Reference: ${orderId}`;
+    sendSMS(formattedPhone, smsMessage).catch(err => console.warn('SMS notification failed:', err));
 
-      return res.json({
+    return {
+      ok: true,
+      status: 200,
+      body: {
         success: true,
         message: 'M-Pesa prompt sent to your phone. Please enter your PIN to complete payment.',
         checkoutRequestId: response.data.CheckoutRequestID,
         merchantRequestId: response.data.MerchantRequestID,
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: response.data.ResponseDescription || 'Failed to initiate payment',
-      });
-    }
+      },
+    };
+  }
+
+  return {
+    ok: false,
+    status: 400,
+    body: {
+      success: false,
+      message: response.data.ResponseDescription || 'Failed to initiate payment',
+    },
+  };
+}
+
+app.post('/api/mpesa-initiate', async (req, res) => {
+  try {
+    const { phone, amount, orderId, email } = req.body;
+    const result = await initiateMpesaPayment({ phone, amount, orderId });
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('M-Pesa Initiate Error:', error.response?.data || error.message);
 
@@ -421,6 +455,36 @@ app.post('/api/mpesa-initiate', async (req, res) => {
       }, 2000);
     }
 
+    return res.status(500).json({
+      success: false,
+      message: error.response?.data?.errorMessage || 'Failed to initiate M-Pesa payment. Make sure your Daraja credentials are configured.',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * Compatibility endpoint for Safaricom sample integrations
+ * Accepts form-data or JSON with: phone, amount
+ */
+app.post('/api/mpesa_payment', async (req, res) => {
+  try {
+    const phone = req.body?.phone;
+    const amount = req.body?.amount ?? 1;
+    const orderId = `MPESA-${Date.now()}`;
+
+    const result = await initiateMpesaPayment({ phone, amount, orderId });
+
+    if (result.ok) {
+      return res.status(200).json({
+        message: 'Please Complete Payment in Your Phone and we will deliver in minutes',
+        ...result.body,
+      });
+    }
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error('M-Pesa Payment Error:', error.response?.data || error.message);
     return res.status(500).json({
       success: false,
       message: error.response?.data?.errorMessage || 'Failed to initiate M-Pesa payment. Make sure your Daraja credentials are configured.',
@@ -673,7 +737,7 @@ app.post('/api/bookings/:orderId/mark-paid', async (req, res) => {
     const { orderId } = req.params;
     const { payment_intent_id, transaction_receipt } = req.body;
 
-    const updated = markBookingPaid(orderId, { payment_intent_id, transaction_receipt });
+    let updated = markBookingPaid(orderId, { payment_intent_id, transaction_receipt });
 
     // Notify customer
     if (updated && updated.email) {
