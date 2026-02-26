@@ -20,7 +20,6 @@ app.use(cors());
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2022-11-15' });
 
 const PORT = process.env.PORT || 5000;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 // M-Pesa Daraja API credentials (from environment variables)
@@ -87,6 +86,7 @@ function createBooking(data) {
     checkout_request_id: null,
     payment_intent_id: null,
     transaction_receipt: null,
+    mpesa_transaction_code: null,
     created_at: new Date().toISOString(),
   };
   bookings.push(booking);
@@ -116,6 +116,7 @@ function markBookingPaid(orderId, updates = {}) {
   bookings[idx].payment_status = 'paid';
   if (updates.payment_intent_id) bookings[idx].payment_intent_id = updates.payment_intent_id;
   if (updates.transaction_receipt) bookings[idx].transaction_receipt = updates.transaction_receipt;
+  if (updates.mpesa_transaction_code) bookings[idx].mpesa_transaction_code = updates.mpesa_transaction_code;
   writeBookingsFile(bookings);
   return bookings[idx];
 }
@@ -217,18 +218,24 @@ function formatPhoneNumber(phone) {
 /**
  * KAI chat endpoint (site-specific OpenAI assistant)
  */
-app.post('/api/kai-chat', async (req, res) => {
+app.post(['/api/kai-chat', '/chat'], async (req, res) => {
   try {
     const { message, history } = req.body || {};
+    const openaiApiKey = process.env.OPENAI_API_KEY || '';
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ success: false, message: 'Message is required' });
     }
 
-    if (!OPENAI_API_KEY) {
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) {
+      return res.status(400).json({ success: false, message: 'Message is required' });
+    }
+
+    if (!openaiApiKey) {
       return res.status(503).json({
         success: false,
-        message: 'KAI AI is not configured on the server. Set OPENAI_API_KEY in server/.env',
+        message: 'Kai AI is currently unavailable while service setup is completed. Please try again shortly.',
       });
     }
 
@@ -236,35 +243,37 @@ app.post('/api/kai-chat', async (req, res) => {
       ? history
         .slice(-12)
         .filter((item) => item && (item.role === 'user' || item.role === 'assistant') && typeof item.content === 'string')
-        .map((item) => ({ role: item.role, content: item.content }))
+        .map((item) => ({ role: item.role, content: item.content.slice(0, 1500) }))
       : [];
 
     const systemPrompt = [
-      'You are Kai, the official AI assistant for Tripple Kay Cutts & Spa in Nairobi.',
-      'Your role: help customers with bookings, services, pricing, opening hours, contact details, and basic grooming guidance for this salon only.',
-      'Business context: Hours are Mon-Fri 9:00 AM-6:00 PM, Sat 10:00 AM-5:00 PM, closed Sunday.',
-      'Services include barbering and nails/spa. Typical pricing guide: haircuts about 4,550-9,750 KES, nails about 3,900-12,350 KES.',
-      'If asked to book, guide them to the site booking flow and suggest visiting the Services page.',
-      'Be concise, warm, and professional. Keep replies around 2-4 short sentences.',
-      'Do not invent policies or unavailable services; if unsure, suggest contacting the shop for confirmation.',
+      'You are Kai, the official AI assistant for Tripple Kay Cutts Spa in Bomet County, Kenya.',
+      'You are professional, friendly, and stylish.',
+      'Answer clearly and politely.',
+      'Encourage customers to book appointments.',
+      'If a booking is requested, ask for preferred date and time.',
+      'If customers ask about services, respond confidently and attractively.',
+      'If unsure, politely ask for clarification.',
+      'Keep responses short, helpful, and classy.',
     ].join(' ');
 
     const response = await axios.post(
       'https://api.openai.com/v1/chat/completions',
       {
         model: OPENAI_MODEL,
-        temperature: 0.4,
-        max_tokens: 220,
+        temperature: 0.25,
+        max_tokens: 280,
         messages: [
           { role: 'system', content: systemPrompt },
           ...safeHistory,
-          { role: 'user', content: message },
+          { role: 'user', content: trimmedMessage.slice(0, 2000) },
         ],
       },
       {
+        timeout: 15000,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          Authorization: `Bearer ${openaiApiKey}`,
         },
       }
     );
@@ -276,10 +285,34 @@ app.post('/api/kai-chat', async (req, res) => {
 
     return res.json({ success: true, text });
   } catch (error) {
+    const openaiCode = error?.response?.data?.error?.code;
+    const openaiMessage = error?.response?.data?.error?.message;
     console.error('KAI chat error:', error.response?.data || error.message);
+
+    if (openaiCode === 'insufficient_quota') {
+      return res.status(503).json({
+        success: false,
+        message: 'Kai AI chat is currently offline due to service limits. Please try again shortly.',
+      });
+    }
+
+    if (openaiCode === 'invalid_api_key') {
+      return res.status(503).json({
+        success: false,
+        message: 'Kai AI is currently unavailable due to a service configuration issue. Please try again shortly.',
+      });
+    }
+
+    if (openaiMessage && typeof openaiMessage === 'string') {
+      return res.status(500).json({
+        success: false,
+        message: `Kai could not respond right now: ${openaiMessage}`,
+      });
+    }
+
     return res.status(500).json({
       success: false,
-      message: 'KAI could not respond right now. Please try again shortly.',
+      message: 'Kai could not respond right now. Please try again shortly.',
     });
   }
 });
@@ -565,7 +598,7 @@ app.post('/api/mpesa-callback', (req, res) => {
             const amount = items.find((i) => i.Name === 'Amount')?.Value || null;
             const phone = items.find((i) => i.Name === 'PhoneNumber')?.Value || null;
 
-            markBookingPaid(booking.order_id, { transaction_receipt: receipt });
+            markBookingPaid(booking.order_id, { transaction_receipt: receipt, mpesa_transaction_code: receipt });
 
             // Notify user
             sendEmail(booking.email, 'Booking Paid - Tripple Kay Cuts', `<p>Your booking (${booking.order_id}) has been paid via M-Pesa. Receipt: ${receipt}. Amount: KES ${amount}.</p>`).catch(() => { });
@@ -735,9 +768,13 @@ app.get('/api/bookings/:orderId', (req, res) => {
 app.post('/api/bookings/:orderId/mark-paid', async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { payment_intent_id, transaction_receipt } = req.body;
+    const { payment_intent_id, transaction_receipt, mpesa_transaction_code } = req.body;
 
-    let updated = markBookingPaid(orderId, { payment_intent_id, transaction_receipt });
+    let updated = markBookingPaid(orderId, {
+      payment_intent_id,
+      transaction_receipt,
+      mpesa_transaction_code: mpesa_transaction_code || transaction_receipt,
+    });
 
     // Notify customer
     if (updated && updated.email) {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageCircle, Send, X, Minimize2, Maximize2, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { MessageCircle, Send, X, Minimize2, Maximize2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { SERVER_BASE_URL } from "@/lib/api";
@@ -18,7 +18,7 @@ const KaiChatbot = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Hey there! 👋 I'm Kai, your personal barber assistant at Tripple Kay Cutts & Spa. How can I help you today?",
+      text: "Welcome to Tripple Kay Cutts & Spa. I’m Kai, your grooming concierge. How can I assist you today?",
       sender: "kai",
       timestamp: new Date(),
       suggestions: [
@@ -30,12 +30,7 @@ const KaiChatbot = () => {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isVoiceSupported, setIsVoiceSupported] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [isVoiceReplyEnabled, setIsVoiceReplyEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<any>(null);
-  const handleSendMessageRef = useRef<(text?: string, action?: () => void) => void>(() => undefined);
   const navigate = useNavigate();
 
   const scrollToBottom = () => {
@@ -50,7 +45,7 @@ const KaiChatbot = () => {
   const knowledgeBase = {
     booking: {
       keywords: ["book", "appointment", "schedule", "reserve", "when", "available"],
-      response: "Great! I'd love to help you book an appointment. 📅\n\n⏰ HOURS:\nMonday-Friday: 9:00 AM - 6:00 PM\nSaturday: 10:00 AM - 5:00 PM\nSunday: Closed\n\nWhat service interests you?",
+      response: "Excellent choice. I can help you secure your appointment.\n\nHours:\nMonday-Friday: 9:00 AM - 6:00 PM\nSaturday: 10:00 AM - 5:00 PM\nSunday: Closed\n\nWhich service would you like to book?",
       suggestions: [
         { label: "Haircut", value: "haircut" },
         { label: "Beard trim", value: "beard" },
@@ -60,7 +55,7 @@ const KaiChatbot = () => {
     },
     services: {
       keywords: ["service", "offer", "what do you provide"],
-      response: "We offer premium barbering and spa services! 💼\n\n💇 HAIRCUTS & GROOMING\n✨ Classic Cut - 4,550 KES\n✨ Premium Fade - 5,850 KES\n✨ Beard Sculpting - 3,900 KES\n✨ Full Experience - 9,750 KES\n\n💅 NAIL & SPA\n✨ Manicures, Pedicures, Gel, Nail Art\n\nWant to book one?",
+      response: "We offer a premium barbering and grooming experience.\n\nHaircuts & Grooming:\n• Classic Cut - 4,550 KES\n• Premium Fade - 5,850 KES\n• Beard Sculpting - 3,900 KES\n• Full Experience - 9,750 KES\n\nNails & Spa:\n• Manicures, Pedicures, Gel, and Nail Art\n\nWould you like me to help you book one?",
       suggestions: [
         { label: "Book service", action: () => navigate("/services") },
         { label: "See pricing", value: "What are your prices?" },
@@ -69,7 +64,7 @@ const KaiChatbot = () => {
     },
     grooming: {
       keywords: ["tip", "advice", "care", "grooming", "how to"],
-      response: "Here are my top grooming tips! 💡\n\n✂️ BEARD CARE\n• Trim every 2-3 weeks\n• Use beard oil daily\n• Keep it moisturized\n\n💇 HAIR MAINTENANCE\n• Wash 2-3x per week\n• Use quality shampoo\n• Get trims every 3-4 weeks\n\n💅 NAIL HEALTH\n• Keep clean and dry\n• Moisturize regularly\n\nMore tips or ready to book?",
+      response: "Here are professional grooming essentials:\n\nBeard Care:\n• Trim every 2-3 weeks\n• Apply beard oil daily\n• Keep skin hydrated\n\nHair Maintenance:\n• Wash 2-3 times weekly\n• Use a quality shampoo\n• Schedule trims every 3-4 weeks\n\nNail Care:\n• Keep nails clean and dry\n• Moisturize regularly\n\nWould you like more tips or would you prefer to book a service?",
       suggestions: [
         { label: "Book service", action: () => navigate("/services") },
         { label: "More tips", value: "Tell me more grooming tips" },
@@ -97,7 +92,7 @@ const KaiChatbot = () => {
     const lowerInput = userInput.toLowerCase();
     if (toneRepairKeywords.some((kw) => lowerInput.includes(kw))) {
       return {
-        text: "I'm really sorry if I came across the wrong way. That’s not my intention. I’m here to help—what can I do for you right now?",
+        text: "Thank you for the feedback, and I’m sorry about your experience. I’m here to make this easy and helpful from here onward. How would you like me to assist you right now?",
         suggestions: [
           { label: "Book appointment", value: "I want to book an appointment" },
           { label: "See services", value: "What services do you offer?" },
@@ -127,13 +122,32 @@ const KaiChatbot = () => {
 
         if (response.ok) {
           const data = await response.json();
-          const text = data?.text || "I'm having trouble responding right now. Try again?";
+          const text = data?.text || "I’m unable to respond fully at the moment, but I can still help with bookings, services, and pricing.";
           return {
             text,
             suggestions: [
               { label: "Book now", action: () => navigate("/services") },
               { label: "Services", value: "What services do you offer?" },
               { label: "Contact", action: () => navigate("/contact") },
+            ],
+          };
+        }
+
+        let backendMessage = "";
+        try {
+          const errorData = await response.json();
+          backendMessage = typeof errorData?.message === "string" ? errorData.message : "";
+        } catch {
+          // ignore parse failure
+        }
+
+        if (backendMessage.toLowerCase().includes("quota exceeded")) {
+          return {
+            text: "Kai AI chat is briefly unavailable. I can still assist you with bookings, services, pricing, and opening hours right now.",
+            suggestions: [
+              { label: "Book now", action: () => navigate("/services") },
+              { label: "Services", value: "What services do you offer?" },
+              { label: "Hours", value: "What are your opening hours?" },
             ],
           };
         }
@@ -155,7 +169,7 @@ const KaiChatbot = () => {
 
     // Default helpful response
     return {
-      text: "That's a great question! I can help with bookings, service details, pricing, or grooming tips. What would you like to know more about?",
+      text: "I can help with bookings, service details, pricing, and grooming guidance. Which area would you like to explore first?",
       suggestions: [
         { label: "Book appointment", value: "I want to book" },
         { label: "See services", action: () => navigate("/services") },
@@ -163,25 +177,6 @@ const KaiChatbot = () => {
       ],
     };
   };
-
-  const speakText = useCallback(
-    (text: string) => {
-      if (!isVoiceReplyEnabled) return;
-      if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1;
-      utterance.pitch = 1;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
-    },
-    [isVoiceReplyEnabled]
-  );
-
-  useEffect(() => {
-    if (!isVoiceReplyEnabled && typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-  }, [isVoiceReplyEnabled]);
 
   const handleSendMessage = useCallback(async (text?: string, action?: () => void) => {
     const messageText = text || inputValue.trim();
@@ -217,72 +212,8 @@ const KaiChatbot = () => {
       };
       setMessages((prev) => [...prev, aiMessage]);
       setIsLoading(false);
-      speakText(response.text);
     }, 600);
-  }, [getAIResponse, inputValue, speakText]);
-
-  useEffect(() => {
-    handleSendMessageRef.current = handleSendMessage;
-  }, [handleSendMessage]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setIsVoiceSupported(false);
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.continuous = false;
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results?.[0]?.[0]?.transcript;
-      if (transcript) {
-        setInputValue(transcript);
-        handleSendMessageRef.current(transcript);
-      }
-    };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-    setIsVoiceSupported(true);
-
-    return () => {
-      try {
-        recognition.stop();
-      } catch {
-        // ignore
-      }
-    };
-  }, []);
-
-  const toggleListening = () => {
-    if (!isVoiceSupported || !recognitionRef.current) return;
-
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch {
-        setIsListening(false);
-      }
-    }
-  };
+  }, [getAIResponse, inputValue]);
 
   return (
     <div
@@ -414,32 +345,6 @@ const KaiChatbot = () => {
                     className="flex-1 px-4 py-2 rounded-full bg-white/5 border border-white/20 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary transition-colors"
                   />
                   <button
-                    type="button"
-                    onClick={() => setIsVoiceReplyEnabled((prev) => !prev)}
-                    className="p-2 rounded-full bg-white/5 border border-white/20 text-foreground hover:border-primary/60 transition-colors"
-                    aria-label={isVoiceReplyEnabled ? "Mute Kai voice" : "Unmute Kai voice"}
-                  >
-                    {isVoiceReplyEnabled ? (
-                      <Volume2 className="w-5 h-5" />
-                    ) : (
-                      <VolumeX className="w-5 h-5" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={toggleListening}
-                    disabled={!isVoiceSupported}
-                    className="p-2 rounded-full bg-white/5 border border-white/20 text-foreground hover:border-primary/60 transition-colors disabled:opacity-40"
-                    aria-label={isListening ? "Stop listening" : "Start listening"}
-                    title={!isVoiceSupported ? "Voice input not supported in this browser" : undefined}
-                  >
-                    {isListening ? (
-                      <MicOff className="w-5 h-5" />
-                    ) : (
-                      <Mic className="w-5 h-5" />
-                    )}
-                  </button>
-                  <button
                     onClick={() => handleSendMessage()}
                     disabled={isLoading || !inputValue.trim()}
                     className="p-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
@@ -480,7 +385,7 @@ const KaiChatbot = () => {
               className="flex items-center gap-3"
             >
               <MessageCircle className="w-5 h-5" />
-              <span>Talk to Kai AI</span>
+              <span>Chat with Kai AI</span>
             </motion.div>
           )}
         </AnimatePresence>

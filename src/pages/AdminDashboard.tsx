@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Edit2, Trash2, Plus, Check, X } from 'lucide-react';
-import { API_BASE_URL } from '@/lib/api';
+import { API_BASE_URL, SERVER_BASE_URL } from '@/lib/api';
 
 interface Service {
     id: number;
@@ -24,13 +24,18 @@ interface Service {
 
 interface Booking {
     order_id: string;
-    user_name: string;
-    user_email: string;
+    name?: string;
+    email?: string;
+    phone?: string;
     service_name: string;
     date: string;
     time: string;
     price: number;
     payment_status: string;
+    payment_method?: string;
+    checkout_request_id?: string | null;
+    transaction_receipt?: string | null;
+    created_at?: string;
 }
 
 interface User {
@@ -72,8 +77,8 @@ const AdminDashboard = () => {
                 'Content-Type': 'application/json',
             };
 
-            // Fetch bookings
-            const bookingsRes = await fetch(`${API_BASE_URL}/admin/bookings.php`, { headers });
+            // Fetch bookings from server-backed storage
+            const bookingsRes = await fetch(`${SERVER_BASE_URL}/api/bookings`);
             const bookingsData = await bookingsRes.json();
             if (bookingsData.success) setBookings(bookingsData.bookings || []);
 
@@ -145,13 +150,12 @@ const AdminDashboard = () => {
     const updateBookingStatus = async (orderId: string, status: string) => {
         try {
             const token = localStorage.getItem('auth_token');
-            const response = await fetch(`${API_BASE_URL}/admin/bookings.php`, {
-                method: 'PUT',
+            const response = await fetch(`${SERVER_BASE_URL}/api/bookings/${orderId}/mark-paid`, {
+                method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ order_id: orderId, payment_status: status }),
+                body: JSON.stringify({ payment_status: status }),
             });
             const data = await response.json();
             if (data.success) {
@@ -236,8 +240,11 @@ const AdminDashboard = () => {
                                                     <Card key={booking.order_id} className="p-4 bg-muted/50">
                                                         <div className="flex justify-between items-start mb-2">
                                                             <div>
-                                                                <p className="font-bold">{booking.user_name} - {booking.service_name}</p>
-                                                                <p className="text-sm text-muted-foreground">{booking.user_email}</p>
+                                                                <p className="font-bold">{booking.name || 'Customer'} - {booking.service_name}</p>
+                                                                <p className="text-sm text-muted-foreground">{booking.email || 'No email'}</p>
+                                                                {booking.phone && (
+                                                                    <p className="text-xs text-muted-foreground">{booking.phone}</p>
+                                                                )}
                                                             </div>
                                                             <span className={`text-xs px-2 py-1 rounded-full font-medium ${booking.payment_status === 'paid' ? 'bg-green-500/10 text-green-700' :
                                                                 booking.payment_status === 'pending' ? 'bg-yellow-500/10 text-yellow-700' :
@@ -246,7 +253,21 @@ const AdminDashboard = () => {
                                                                 {booking.payment_status}
                                                             </span>
                                                         </div>
-                                                        <p className="text-sm mb-3">{booking.date} at {booking.time} • KES {booking.price}</p>
+                                                        <p className="text-sm mb-2">{booking.date} at {booking.time} • KES {booking.price}</p>
+                                                        <div className="text-xs text-muted-foreground space-y-1 mb-3">
+                                                            {booking.payment_method && (
+                                                                <p>Method: {booking.payment_method}</p>
+                                                            )}
+                                                            {booking.checkout_request_id && (
+                                                                <p>Checkout ID: {booking.checkout_request_id}</p>
+                                                            )}
+                                                            {booking.transaction_receipt && (
+                                                                <p>Receipt: {booking.transaction_receipt}</p>
+                                                            )}
+                                                            {booking.created_at && (
+                                                                <p>Created: {new Date(booking.created_at).toLocaleString()}</p>
+                                                            )}
+                                                        </div>
                                                         <div className="flex gap-2">
                                                             {booking.payment_status !== 'paid' && (
                                                                 <Button size="sm" onClick={() => updateBookingStatus(booking.order_id, 'paid')}>

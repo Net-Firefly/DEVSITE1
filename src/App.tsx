@@ -16,7 +16,7 @@ import SignUp from "./pages/SignUp";
 import MyBookings from "./pages/MyBookings";
 import AdminDashboard from "./pages/AdminDashboard";
 import FloatingContact from "./components/FloatingContact";
-import KaiChatbot from "./components/KaiChatbot";
+import KaiChatWidget from "./components/KaiChatWidget";
 import PageTransition from "./components/PageTransition";
 import { AuthProvider } from "./contexts/AuthContext";
 
@@ -98,7 +98,7 @@ const App = () => (
         <AuthProvider>
           <AnimatedRoutes />
           <FloatingContact />
-          <KaiChatbot />
+          <KaiChatWidget />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
