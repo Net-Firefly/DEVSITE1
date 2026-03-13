@@ -67,8 +67,7 @@ const Navigation = () => {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-40 transition-all duration-500 ${isScrolled ? "glass-card py-4" : "py-6"
-        }`}
+      className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${isScrolled ? "py-3" : "py-5"}`}
     >
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center min-h-screen">
@@ -100,55 +99,57 @@ const Navigation = () => {
           </div>
         </div>
       )}
-      <div className="container mx-auto px-6">
-        <div className="flex items-center justify-between">
+      <div className="container mx-auto px-4 sm:px-6">
+        <div
+          className={`flex items-center justify-between rounded-2xl border px-4 sm:px-5 py-3 transition-all duration-300 ${
+            isScrolled
+              ? "bg-card/90 backdrop-blur-xl border-primary/25 shadow-2xl"
+              : "bg-card/70 backdrop-blur-lg border-border/40"
+          }`}
+        >
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 group">
+          <Link to="/" className="flex items-center gap-3 group min-w-0">
             <motion.div
-              whileHover={{ rotate: 180 }}
-              transition={{ duration: 0.5 }}
-              className="w-12 h-12 rounded-full border-2 border-primary/50 flex items-center justify-center group-hover:border-primary transition-colors duration-300 flex-shrink-0"
+              whileHover={{ rotate: 10, scale: 1.04 }}
+              transition={{ duration: 0.25 }}
+              className="w-10 h-10 rounded-full border border-primary/60 bg-primary/10 flex items-center justify-center group-hover:border-primary transition-colors duration-300 flex-shrink-0"
             >
-              <Scissors className="w-6 h-6 text-primary" />
+              <Scissors className="w-5 h-5 text-primary" />
             </motion.div>
-            <div className="flex flex-col">
-              <span className="font-display text-lg font-bold text-gold-gradient hidden sm:block">
+            <div className="hidden sm:flex flex-col leading-tight">
+              <span className="font-display text-base lg:text-lg font-bold text-gold-gradient">
                 Tripple Kay
               </span>
-              <span className="font-body text-xs text-muted-foreground hidden sm:block">
+              <span className="font-body text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
                 CUTTS & SPA
               </span>
             </div>
           </Link>
 
           {/* Desktop navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-1 rounded-full border border-border/60 bg-background/40 px-2 py-1">
             {navLinks.map((link) => (
               <Link
                 key={link.name}
                 to={link.path}
-                className={`font-body transition-colors duration-300 relative group ${isActive(link.path) ? "text-primary" : "text-muted-foreground hover:text-primary"
-                  }`}
+                className={`px-3 py-2 rounded-full text-sm font-medium transition-colors duration-200 relative ${
+                  isActive(link.path)
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+                }`}
               >
                 {link.name}
-                <motion.span
-                  className="absolute -bottom-1 left-0 h-px bg-primary"
-                  initial={{ width: 0 }}
-                  animate={{ width: isActive(link.path) ? "100%" : 0 }}
-                  transition={{ duration: 0.3 }}
-                />
-                <span className="absolute -bottom-1 left-0 w-0 h-px bg-primary transition-all duration-300 group-hover:w-full" />
               </Link>
             ))}
           </div>
 
           {/* CTA Buttons */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2">
             <Link to="/contact">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="btn-gold-glow px-6 py-2.5 rounded-full font-body font-semibold text-primary-foreground text-sm"
+                className="btn-gold-glow px-5 py-2.5 rounded-full font-body font-semibold text-primary-foreground text-sm"
               >
                 Book Now
               </motion.button>
@@ -157,7 +158,7 @@ const Navigation = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-4 py-2 rounded-full bg-primary text-primary-foreground font-body text-sm shadow-md"
+                className="px-4 py-2 rounded-full border border-primary/40 bg-primary/10 text-primary font-body text-sm"
               >
                 Take Quiz
               </motion.button>
@@ -165,17 +166,17 @@ const Navigation = () => {
 
             {/* Auth Buttons */}
             {isAuthenticated ? (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 pl-2 ml-1 border-l border-border/60">
+                <div className="hidden xl:flex items-center gap-2 text-sm px-2">
                   <User className="w-4 h-4 text-primary" />
-                  <span className="text-muted-foreground">{user?.name}</span>
+                  <span className="text-muted-foreground max-w-[130px] truncate">{user?.name}</span>
                 </div>
                 {user?.role === 'admin' && (
                   <Link to="/admin">
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      className="px-4 py-2 rounded-full bg-accent text-foreground text-sm font-body"
+                      className="px-4 py-2 rounded-full bg-accent text-foreground text-sm font-body border border-border/60"
                     >
                       Admin
                     </motion.button>
@@ -186,7 +187,7 @@ const Navigation = () => {
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      className="px-4 py-2 rounded-full border border-border hover:bg-accent text-sm font-body"
+                      className="px-4 py-2 rounded-full border border-border hover:bg-accent/60 text-sm font-body"
                     >
                       My Bookings
                     </motion.button>
@@ -197,19 +198,19 @@ const Navigation = () => {
                   whileTap={{ scale: 0.95 }}
                   onClick={handleLogoutClick}
                   disabled={isLoggingOut || showLogoutConfirm}
-                  className="flex items-center gap-1 px-4 py-2 rounded-full border border-border hover:bg-accent text-sm font-body disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1 px-4 py-2 rounded-full border border-border hover:bg-accent/60 text-sm font-body disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   <LogOut className="w-4 h-4" />
                   {isLoggingOut ? 'Logging out...' : 'Logout'}
                 </motion.button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pl-2 ml-1 border-l border-border/60">
                 <Link to="/login">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="px-4 py-2 rounded-full border border-border hover:bg-accent text-sm font-body"
+                    className="px-4 py-2 rounded-full border border-border hover:bg-accent/60 text-sm font-body"
                   >
                     Login
                   </motion.button>
@@ -218,7 +219,7 @@ const Navigation = () => {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="px-4 py-2 rounded-full bg-accent text-foreground font-body text-sm"
+                    className="px-4 py-2 rounded-full bg-accent text-foreground font-body text-sm border border-border/60"
                   >
                     Sign Up
                   </motion.button>
@@ -231,7 +232,7 @@ const Navigation = () => {
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden w-10 h-10 flex items-center justify-center text-foreground"
+            className="md:hidden w-10 h-10 rounded-full border border-border/70 bg-background/40 flex items-center justify-center text-foreground"
           >
             {isMobileMenuOpen ? <X /> : <Menu />}
           </motion.button>
@@ -245,9 +246,9 @@ const Navigation = () => {
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.3 }}
-              className="md:hidden mt-6 pb-6 border-t border-border/50 pt-6 overflow-hidden"
+              className="md:hidden mt-3 overflow-hidden rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl px-4 py-4 shadow-xl"
             >
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
                 {navLinks.map((link, index) => (
                   <motion.div
                     key={link.name}
@@ -257,8 +258,7 @@ const Navigation = () => {
                   >
                     <Link
                       to={link.path}
-                      className={`font-body text-lg transition-colors block ${isActive(link.path) ? "text-primary" : "text-muted-foreground hover:text-primary"
-                        }`}
+                      className={`font-body text-base px-3 py-2 rounded-xl transition-colors block ${isActive(link.path) ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-accent/50"}`}
                     >
                       {link.name}
                     </Link>
@@ -270,7 +270,7 @@ const Navigation = () => {
                   transition={{ delay: navLinks.length * 0.1 }}
                 >
                   <Link to="/contact">
-                    <button className="btn-gold-glow px-6 py-3 rounded-full font-body font-semibold text-primary-foreground w-full mt-4">
+                    <button className="btn-gold-glow px-6 py-3 rounded-full font-body font-semibold text-primary-foreground w-full mt-3">
                       Book Now
                     </button>
                   </Link>
@@ -282,7 +282,7 @@ const Navigation = () => {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: (navLinks.length + 1) * 0.1 }}
-                    className="mt-4 pt-4 border-t border-border/50"
+                    className="mt-3 pt-3 border-t border-border/50"
                   >
                     <div className="flex items-center gap-2 mb-3 text-sm">
                       <User className="w-4 h-4 text-primary" />
@@ -318,7 +318,7 @@ const Navigation = () => {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: (navLinks.length + 1) * 0.1 }}
-                    className="flex gap-2 mt-4"
+                    className="flex gap-2 mt-3"
                   >
                     <Link to="/login" className="flex-1">
                       <button className="w-full px-6 py-3 rounded-full border border-border hover:bg-accent font-body">
