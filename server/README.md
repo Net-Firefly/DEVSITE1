@@ -59,6 +59,14 @@ The app will be available at `http://localhost:8080/`
 
 To use real M-Pesa payments, you need Daraja API credentials:
 
+### Database configuration (Vercel)
+For Vercel deployments, set the following environment variables in your project settings:
+- `DATABASE_URL` (preferred) e.g. `mysql://user:password@host:3306/database`
+- or `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`
+
+If database connection fails, the server falls back to `server/bookings.json` for local storage.
+
+
 ### Get Daraja API Credentials
 
 1. Go to [https://developer.safaricom.co.ke/](https://developer.safaricom.co.ke/)

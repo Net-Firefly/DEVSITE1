@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
 import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
+import mysql from 'mysql2/promise';
 
 dotenv.config();
 
@@ -41,34 +42,106 @@ let tokenExpiry = null;
 const GCALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || '';
 const GCALENDAR_ON_PAYMENT = String(process.env.GOOGLE_CALENDAR_ON_PAYMENT || 'false').toLowerCase() === 'true';
 
-// File-backed bookings storage (bookings.json in workspace root)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const BOOKINGS_FILE = path.resolve(__dirname, '..', 'bookings.json');
+// Database setup: support direct DB URL (Vercel), or MySQL host/user/password
+const DB_URL = process.env.DATABASE_URL || process.env.VERCEL_DATABASE_URL || process.env.MYSQL_URL || '';
+const MYSQL_HOST = process.env.MYSQL_HOST || process.env.DB_HOST || '';
+const MYSQL_USER = process.env.MYSQL_USER || process.env.DB_USER || '';
+const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD || '';
+const MYSQL_DATABASE = process.env.MYSQL_DATABASE || process.env.DB_DATABASE || '';
 
-function readBookingsFile() {
+let db = null;
+let dbInitialized = false;
+
+async function initDbPool() {
+  if (DB_URL) {
+    db = mysql.createPool(DB_URL);
+  } else if (MYSQL_HOST && MYSQL_USER && MYSQL_DATABASE) {
+    db = mysql.createPool({
+      host: MYSQL_HOST,
+      user: MYSQL_USER,
+      password: MYSQL_PASSWORD,
+      database: MYSQL_DATABASE,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+  }
+
+  if (!db) {
+    console.warn('[DB] No database configuration detected. Falling back to disk-file bookings.json storage.');
+    return;
+  }
+
   try {
-    if (fs.existsSync(BOOKINGS_FILE)) {
-      const raw = fs.readFileSync(BOOKINGS_FILE, 'utf8');
-      return JSON.parse(raw || '[]');
+    await db.query('SELECT 1');
+    await db.query(
+      `CREATE TABLE IF NOT EXISTS bookings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id VARCHAR(64) UNIQUE,
+        service_id VARCHAR(64),
+        service_name VARCHAR(120),
+        name VARCHAR(120),
+        email VARCHAR(255),
+        phone VARCHAR(64),
+        date VARCHAR(32),
+        time VARCHAR(32),
+        notes TEXT,
+        price DECIMAL(10,2) DEFAULT 0,
+        payment_method VARCHAR(50),
+        payment_status VARCHAR(20) DEFAULT 'pending',
+        checkout_request_id VARCHAR(255),
+        payment_intent_id VARCHAR(255),
+        transaction_receipt VARCHAR(255),
+        mpesa_transaction_code VARCHAR(255),
+        calendar_event_id VARCHAR(255),
+        calendar_event_link VARCHAR(512),
+        created_at DATETIME,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+      `
+    );
+    dbInitialized = true;
+    console.log('[DB] Database connected and bookings table ready.');
+  } catch (err) {
+    console.warn('[DB] Failed to initialize DB connection. Falling back to local JSON storage.', err.message);
+    db = null;
+  }
+}
+
+const bookingsFilePath = path.resolve(process.cwd(), 'server', 'bookings.json');
+
+async function readLocalBookings() {
+  try {
+    if (!fs.existsSync(bookingsFilePath)) {
+      return [];
     }
-    return [];
+    const raw = fs.readFileSync(bookingsFilePath, 'utf8');
+    return JSON.parse(raw || '[]');
   } catch (err) {
-    console.warn('Failed to read bookings file:', err.message);
+    console.warn('[Bookings] Could not read local bookings file, resetting.', err.message);
     return [];
   }
 }
 
-function writeBookingsFile(bookings) {
+async function saveLocalBookings(bookings = []) {
   try {
-    fs.writeFileSync(BOOKINGS_FILE, JSON.stringify(bookings, null, 2), 'utf8');
+    fs.writeFileSync(bookingsFilePath, JSON.stringify(bookings, null, 2), 'utf8');
   } catch (err) {
-    console.warn('Failed to write bookings file:', err.message);
+    console.warn('[Bookings] Could not persist local bookings file.', err.message);
   }
 }
 
-function createBooking(data) {
-  const bookings = readBookingsFile();
+function isDbAvailable() {
+  return !!db;
+}
+
+// Initialize DB pool at startup (best effort)
+initDbPool().catch((err) => {
+  console.warn('[DB] initDbPool error:', err?.message || err);
+});
+
+// MySQL-based booking functions
+async function createBooking(data) {
   const orderId = data.order_id || `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const booking = {
     order_id: orderId,
@@ -80,7 +153,7 @@ function createBooking(data) {
     date: data.date || null,
     time: data.time || null,
     notes: data.notes || null,
-    price: data.price || 0,
+    price: Number(data.price || 0),
     payment_method: data.payment_method || 'unknown',
     payment_status: 'pending',
     checkout_request_id: null,
@@ -89,45 +162,117 @@ function createBooking(data) {
     mpesa_transaction_code: null,
     created_at: new Date().toISOString(),
   };
-  bookings.push(booking);
-  writeBookingsFile(bookings);
+
+  if (isDbAvailable()) {
+    await db.query(
+      `INSERT INTO bookings (order_id, service_id, service_name, name, email, phone, date, time, notes, price, payment_method, payment_status, checkout_request_id, payment_intent_id, transaction_receipt, mpesa_transaction_code, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        booking.order_id,
+        booking.service_id,
+        booking.service_name,
+        booking.name,
+        booking.email,
+        booking.phone,
+        booking.date,
+        booking.time,
+        booking.notes,
+        booking.price,
+        booking.payment_method,
+        booking.payment_status,
+        booking.checkout_request_id,
+        booking.payment_intent_id,
+        booking.transaction_receipt,
+        booking.mpesa_transaction_code,
+        booking.created_at,
+      ]
+    );
+    return booking;
+  }
+
+  const existing = await readLocalBookings();
+  existing.push(booking);
+  await saveLocalBookings(existing);
   return booking;
 }
 
-function getBookingByOrderId(orderId) {
-  const bookings = readBookingsFile();
-  return bookings.find((b) => b.order_id === orderId);
+async function getBookingByOrderId(orderId) {
+  if (isDbAvailable()) {
+    const [rows] = await db.query('SELECT * FROM bookings WHERE order_id = ?', [orderId]);
+    return rows[0] || null;
+  }
+  const all = await readLocalBookings();
+  return all.find((item) => item.order_id === orderId) || null;
 }
 
-function getBookingByCheckoutRequestId(checkoutRequestId) {
-  const bookings = readBookingsFile();
-  return bookings.find((b) => b.checkout_request_id === checkoutRequestId);
+async function getBookingByCheckoutRequestId(checkoutRequestId) {
+  if (isDbAvailable()) {
+    const [rows] = await db.query('SELECT * FROM bookings WHERE checkout_request_id = ?', [checkoutRequestId]);
+    return rows[0] || null;
+  }
+  const all = await readLocalBookings();
+  return all.find((item) => item.checkout_request_id === checkoutRequestId) || null;
 }
 
-function listBookings() {
-  const bookings = readBookingsFile();
-  return bookings.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+async function listBookings() {
+  if (isDbAvailable()) {
+    const [rows] = await db.query('SELECT * FROM bookings ORDER BY created_at DESC');
+    return rows;
+  }
+  const all = await readLocalBookings();
+  return all.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 }
 
-function markBookingPaid(orderId, updates = {}) {
-  const bookings = readBookingsFile();
+async function markBookingPaid(orderId, updates = {}) {
+  if (isDbAvailable()) {
+    const fields = [];
+    const values = [];
+    if (updates.payment_intent_id) { fields.push('payment_intent_id = ?'); values.push(updates.payment_intent_id); }
+    if (updates.transaction_receipt) { fields.push('transaction_receipt = ?'); values.push(updates.transaction_receipt); }
+    if (updates.mpesa_transaction_code) { fields.push('mpesa_transaction_code = ?'); values.push(updates.mpesa_transaction_code); }
+    fields.push('payment_status = ?'); values.push('paid');
+    values.push(orderId);
+    await db.query(`UPDATE bookings SET ${fields.join(', ')} WHERE order_id = ?`, values);
+    return getBookingByOrderId(orderId);
+  }
+
+  const bookings = await readLocalBookings();
   const idx = bookings.findIndex((b) => b.order_id === orderId);
-  if (idx === -1) return null;
-  bookings[idx].payment_status = 'paid';
-  if (updates.payment_intent_id) bookings[idx].payment_intent_id = updates.payment_intent_id;
-  if (updates.transaction_receipt) bookings[idx].transaction_receipt = updates.transaction_receipt;
-  if (updates.mpesa_transaction_code) bookings[idx].mpesa_transaction_code = updates.mpesa_transaction_code;
-  writeBookingsFile(bookings);
-  return bookings[idx];
+  if (idx !== -1) {
+    bookings[idx] = {
+      ...bookings[idx],
+      payment_status: 'paid',
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+    await saveLocalBookings(bookings);
+    return bookings[idx];
+  }
+  return null;
 }
 
-function updateBookingByOrderId(orderId, updates = {}) {
-  const bookings = readBookingsFile();
+async function updateBookingByOrderId(orderId, updates = {}) {
+  if (isDbAvailable()) {
+    const fields = [];
+    const values = [];
+    for (const key of Object.keys(updates)) {
+      fields.push(`${key} = ?`);
+      values.push(updates[key]);
+    }
+    values.push(orderId);
+    await db.query(`UPDATE bookings SET ${fields.join(', ')} WHERE order_id = ?`, values);
+    return getBookingByOrderId(orderId);
+  }
+
+  const bookings = await readLocalBookings();
   const idx = bookings.findIndex((b) => b.order_id === orderId);
-  if (idx === -1) return null;
-  bookings[idx] = { ...bookings[idx], ...updates };
-  writeBookingsFile(bookings);
-  return bookings[idx];
+  if (idx !== -1) {
+    bookings[idx] = { ...bookings[idx], ...updates, updated_at: new Date().toISOString() };
+    await saveLocalBookings(bookings);
+    return bookings[idx];
+  }
+
+  return null;
 }
 
 async function createCalendarEvent(booking) {
@@ -719,7 +864,7 @@ app.post('/api/bookings', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing required booking fields' });
     }
 
-    const booking = createBooking({ name, email, phone, service_id, service_name, date, time, notes, price: Math.round(price), payment_method, service_duration });
+    const booking = await createBooking({ name, email, phone, service_id, service_name, date, time, notes, price: Math.round(price), payment_method, service_duration });
 
     // Create Google Calendar event immediately unless configured to create on payment
     if (GCALENDAR_ID && !GCALENDAR_ON_PAYMENT) {
