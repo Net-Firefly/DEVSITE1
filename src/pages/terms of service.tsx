@@ -2,8 +2,8 @@ import React from "react";
 
 const TermsOfService: React.FC = () => {
   return (
-    <div className="min-h-screen bg-black text-gray-200 px-6 py-12 flex justify-center">
-      <div className="max-w-4xl bg-zinc-900 rounded-2xl shadow-xl p-8 md:p-12 border border-yellow-600/30">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-gray-200 px-6 py-12 flex justify-center">
+      <div className="max-w-4xl bg-gradient-to-br from-slate-900/70 via-slate-800/80 to-slate-900/90 rounded-2xl shadow-2xl p-8 md:p-12 border border-gold-light/50 ring-1 ring-gold-dark/20">
         <h1 className="text-3xl md:text-4xl font-bold text-yellow-500 mb-6 text-center">
           Terms of Service
         </h1>

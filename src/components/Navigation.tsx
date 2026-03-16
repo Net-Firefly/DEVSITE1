@@ -101,11 +101,11 @@ const Navigation = () => {
       )}
       <div className="container mx-auto px-4 sm:px-6">
         <div
-          className={`flex items-center justify-between rounded-2xl border px-4 sm:px-5 py-3 transition-all duration-300 ${
-            isScrolled
+          className={`flex items-center justify-between rounded-2xl border px-4 sm:px-5 py-3 transition-all duration-300 ${isScrolled
               ? "bg-card/90 backdrop-blur-xl border-primary/25 shadow-2xl"
               : "bg-card/70 backdrop-blur-lg border-border/40"
-          }`}
+            }`}
+          style={{ boxShadow: "0 0 40px rgba(255, 193, 77, 0.15)" }}
         >
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group min-w-0">
@@ -132,11 +132,10 @@ const Navigation = () => {
               <Link
                 key={link.name}
                 to={link.path}
-                className={`px-3 py-2 rounded-full text-sm font-medium transition-colors duration-200 relative ${
-                  isActive(link.path)
+                className={`px-3 py-2 rounded-full text-sm font-medium transition-colors duration-200 relative ${isActive(link.path)
                     ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
-                }`}
+                  }`}
               >
                 {link.name}
               </Link>

@@ -17,8 +17,8 @@ const MessageBubble = ({ message, onQuickReply }) => {
         >
             <div
                 className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-lg ${isUser
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-black/80 border border-primary/35 text-white"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-mural-soft border border-primary/35 text-white"
                     }`}
             >
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>

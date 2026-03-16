@@ -12,7 +12,7 @@ import Newsletter from "@/components/Newsletter";
 import ImagePreloader from "@/components/ImagePreloader";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Scissors, Crown, Sparkles, ArrowRight } from "lucide-react";
+import { Scissors, Crown, Sparkles, ArrowRight, Play, Pause } from "lucide-react";
 
 const featuredServices = [
   { icon: Scissors, name: "Classic Cut", price: "KES 3,500" },
@@ -54,7 +54,7 @@ const Index = () => {
   useEffect(() => {
     if (playVideo && videoRef.current) {
       videoRef.current.muted = false;
-      videoRef.current.play();
+      void videoRef.current.play();
     }
   }, [playVideo]);
 
@@ -75,34 +75,43 @@ const Index = () => {
       {/* Promo Video - plays on scroll into view */}
       <section className="py-16 md:py-20 relative">
         <div
-          className="absolute inset-0 opacity-5"
+          className="absolute inset-0 opacity-15"
           style={{
-            background: "radial-gradient(circle at 70% 30%, hsl(43 74% 49%) 0%, transparent 50%)",
+            background: "linear-gradient(180deg, rgba(20,20,20,0.85), rgba(10,10,10,0.95))",
           }}
         />
+        <div className="absolute inset-0 barber-stripes opacity-40 -z-10" />
 
         <div className="container mx-auto px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="max-w-4xl mx-auto"
+            className="mx-auto"
           >
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-center mb-8">
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-center mb-6 text-slate-100">
               Watch Our <span className="text-gold-gradient">Promo</span>
             </h2>
+            <p className="text-center text-sm md:text-base text-slate-200 mb-8 max-w-2xl mx-auto">
+              Step inside our shop vibes: fresh fades, golden finishes, and premium service in every frame.
+            </p>
 
-            <div className="relative rounded-2xl overflow-hidden aspect-video glass-card shadow-2xl">
-              <video
-                ref={videoRef}
-                src="/promo.mp4"
-                controls
-                className="absolute inset-0 w-full h-full object-cover"
-                title="Tripple Kay Cutts and Spa Promo"
-                poster="/gallery/_DSC0005%20(2).jpg"
-              >
-                Sorry, your browser does not support embedded videos.
-              </video>
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12">
+                <div className="relative rounded-2xl overflow-hidden aspect-video glass-card shadow-2xl border border-gold-light/40">
+                  <video
+                    ref={videoRef}
+                    src="/promo.mp4"
+                    controls
+                    className="absolute inset-0 w-full h-full object-cover"
+                    title="Tripple Kay Cutts and Spa Promo"
+                    poster="/gallery/_DSC0005%20(2).jpg"
+                  >
+                    Sorry, your browser does not support embedded videos.
+                  </video>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
+                </div>
+              </div>
             </div>
           </motion.div>
         </div>

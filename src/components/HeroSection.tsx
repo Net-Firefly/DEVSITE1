@@ -3,14 +3,27 @@ import { MapPin, Bookmark, Share2, Star, Scissors } from "lucide-react";
 const HeroSection = () => {
   return (
     <section className="relative min-h-screen overflow-hidden">
-      {/* Diagonal background layers */}
-      <div className="absolute inset-0 bg-background" />
+      {/* Barber shop vibe background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />
+      <div className="absolute left-0 top-0 h-full w-9 barber-stripes opacity-90" />
+      <div className="absolute right-0 top-0 h-full w-9 barber-stripes opacity-90" />
+      <div className="absolute inset-0 bg-black/35" />
 
-      {/* Diagonal gold accent */}
+      {/* Edge barber animated stripe accent */}
+      <div className="absolute left-0 top-0 h-12 w-10 barber-stripes opacity-90" />
+      <div className="absolute right-0 top-0 h-12 w-10 barber-stripes opacity-90" />
+
+      {/* Spinning barber pole */}
+      <div className="absolute top-20 right-8 z-20">
+        <div className="relative h-24 w-10 rounded-full overflow-hidden border border-yellow-300 shadow-lg animate-spin-slow bg-gradient-to-b from-white via-red-500 to-blue-500">
+          <div className="absolute inset-0 bg-[linear-gradient(120deg,#fff_0%,#fff_12.5%,#e01f24_12.5%,#e01f24_25%,#0f5dc0_25%,#0f5dc0_37.5%,#fff_37.5%,#fff_50%,#e01f24_50%,#e01f24_62.5%,#0f5dc0_62.5%,#0f5dc0_75%,#fff_75%,#fff_100%)]" />
+          <div className="absolute inset-0 bg-black/20 rounded-full" />
+        </div>
+      </div>
       <div
-        className="absolute top-0 right-0 w-1/2 h-full opacity-10"
+        className="absolute top-0 right-0 w-1/2 h-full opacity-20"
         style={{
-          background: "linear-gradient(135deg, transparent 0%, hsl(43 74% 49% / 0.3) 100%)",
+          background: "linear-gradient(135deg, transparent 0%, hsla(320, 96%, 70%, 0.22) 100%)",
           clipPath: "polygon(30% 0, 100% 0, 100% 100%, 0 100%)",
         }}
       />
@@ -34,9 +47,9 @@ const HeroSection = () => {
           {/* Left content */}
           <div className="flex-1 space-y-8 animate-slide-in-left">
             {/* Premium badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 glass-card rounded-full border-gold-glow">
-              <Scissors className="w-4 h-4 text-primary" />
-              <span className="text-sm font-body text-primary">Premium Barbershop</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 barber-ribbon">
+              <Scissors className="w-4 h-4 text-black" />
+              <span className="text-sm font-body">Premium Barbershop</span>
             </div>
 
             {/* Brand name */}

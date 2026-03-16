@@ -109,7 +109,7 @@ const Services = () => {
                             alt={service.name}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           />
-                          <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">Click to preview</div>
+                          <div className="absolute bottom-2 left-2 bg-gradient-to-r from-yellow-300 via-orange-300 to-amber-400 text-black text-xs px-2 py-1 rounded font-semibold shadow-lg">Click to preview</div>
                           {/* Popular badge */}
                           {service.popular && (
                             <div className="absolute -top-3 -right-3 px-4 py-1 bg-primary rounded-full">
@@ -220,7 +220,7 @@ const Services = () => {
                         alt={service.name}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
-                      <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">Click to preview</div>
+                      <div className="absolute bottom-2 left-2 bg-gradient-to-r from-yellow-300 via-orange-300 to-amber-400 text-black text-xs px-2 py-1 rounded font-semibold shadow-lg">Click to preview</div>
                       {/* Popular badge */}
                       {service.popular && (
                         <div className="absolute -top-3 -right-3 px-4 py-1 bg-primary rounded-full">

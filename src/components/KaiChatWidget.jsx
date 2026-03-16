@@ -211,9 +211,9 @@ const KaiChatWidget = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.96 }}
             transition={{ duration: 0.2 }}
-            className="mb-4 flex h-[75vh] max-h-[620px] w-[min(95vw,390px)] flex-col overflow-hidden rounded-2xl border border-primary/40 bg-black text-white shadow-2xl"
+            className="mb-4 flex h-[75vh] max-h-[620px] w-[min(95vw,390px)] flex-col overflow-hidden rounded-2xl border border-primary/40 bg-mural text-white shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-primary/30 bg-black/95 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-primary/30 bg-mural-soft px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/60 bg-primary/20 text-sm font-semibold text-primary">
                   K
@@ -247,7 +247,7 @@ const KaiChatWidget = () => {
               </div>
             </div>
 
-            <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-black/90 px-3 py-4">
+            <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-mural-soft px-3 py-4">
               {messages.map((message) => (
                 <MessageBubble key={message.id} message={message} onQuickReply={handleReplyAction} />
               ))}
@@ -256,8 +256,7 @@ const KaiChatWidget = () => {
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="max-w-[75%] rounded-2xl border border-primary/35 bg-black/80 px-4 py-3"
-                >
+                  className="max-w-[75%] rounded-2xl border border-primary/35 bg-mural-soft px-4 py-3">
                   <div className="flex items-center gap-1">
                     <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.2s]" />
                     <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.1s]" />
@@ -268,7 +267,7 @@ const KaiChatWidget = () => {
               )}
             </div>
 
-            <div className="border-t border-primary/30 bg-black px-3 py-3">
+            <div className="border-t border-primary/30 bg-mural-soft px-3 py-3">
               <div className="mb-2 flex items-center justify-between text-[11px] text-white/60">
                 <span>Max {MAX_MESSAGE_LENGTH} chars</span>
                 <span className={remainingChars < 30 ? "text-amber-300" : ""}>{remainingChars}</span>
@@ -285,7 +284,7 @@ const KaiChatWidget = () => {
                     }
                   }}
                   placeholder="Ask Kai about services, styles, or bookings..."
-                  className="flex-1 rounded-2xl border border-primary/35 bg-black/80 px-4 py-2 text-sm text-white placeholder:text-white/50 focus:border-primary focus:outline-none"
+                  className="flex-1 rounded-2xl border border-primary/35 bg-mural-soft px-4 py-2 text-sm text-white placeholder:text-white/50 focus:border-primary focus:outline-none"
                 />
                 <button
                   type="button"
@@ -306,7 +305,7 @@ const KaiChatWidget = () => {
         whileHover={{ scale: 1.04 }}
         whileTap={{ scale: 0.96 }}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="ml-auto flex h-14 items-center gap-2 rounded-full border border-primary/60 bg-black px-5 text-white shadow-2xl"
+        className="ml-auto flex h-14 items-center gap-2 rounded-full border border-primary/60 bg-mural px-5 text-white shadow-2xl"
       >
         <MessageCircle className="h-5 w-5 text-primary" />
         <span className="text-sm font-medium">Chat with Kai</span>

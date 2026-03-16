@@ -6,49 +6,56 @@
 
 @layer base {
   :root {
-    /* Core darks */
-    --background: 0 0% 8%;
-    --foreground: 45 10% 95%;
+    /* Vibrant mural theme */
+    --background: 227 53% 10%;
+    --foreground: 0 0% 96%;
 
-    /* Rich charcoal for cards */
-    --card: 0 0% 8%;
-    --card-foreground: 45 10% 95%;
+    /* Card surfaces */
+    --card: 235 30% 16%;
+    --card-foreground: 0 0% 96%;
 
-    /* Darker popover */
-    --popover: 0 0% 6%;
-    --popover-foreground: 45 10% 95%;
+    /* Popovers */
+    --popover: 230 50% 16%;
+    --popover-foreground: 0 0% 98%;
 
-    /* Luxurious gold primary */
-    --primary: 43 74% 49%;
-    --primary-foreground: 0 0% 4%;
+    /* Primary brand accent (sunset neon) */
+    --primary: 43 95% 63%;
+    --primary-foreground: 0 0% 10%;
 
-    /* Gold gradient stops */
-    --gold-light: 45 80% 60%;
-    --gold-medium: 43 74% 49%;
-    --gold-dark: 38 70% 35%;
+    /* Gold gradient changed to modern barber stops */
+    --gold-light: 47 100% 68%;
+    --gold-medium: 45 90% 51%;
+    --gold-dark: 40 80% 36%;
 
-    /* Muted surfaces */
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 45 10% 90%;
+    --secondary: 231 91% 23%;
+    --secondary-foreground: 0 0% 97%;
 
-    --muted: 0 0% 14%;
-    --muted-foreground: 0 0% 55%;
+    --muted: 247 65% 16%;
+    --muted-foreground: 0 0% 72%;
 
-    --accent: 0 0% 16%;
-    --accent-foreground: 45 10% 95%;
+    --accent: 197 90% 50%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 11 90% 58%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 18%;
-    --input: 0 0% 15%;
-    --ring: 43 74% 49%;
+    --border: 227 97% 24%;
+    --input: 233 92% 20%;
+    --ring: 320 95% 60%;
 
     --radius: 0.5rem;
 
-    /* Gold glow for effects */
-    --glow-gold: 0 0 30px hsla(43, 74%, 49%, 0.4);
-    --glow-gold-intense: 0 0 50px hsla(43, 74%, 49%, 0.6);
+    --glow-gold: 0 0 30px hsla(330, 96%, 70%, 0.4);
+    --glow-gold-intense: 0 0 50px hsla(330, 96%, 70%, 0.7);
+
+    /* Mural palette */
+    --mural-violet: 261 100% 55%;
+    --mural-fuchsia: 320 100% 62%;
+    --mural-cyan: 190 100% 58%;
+    --vibrant-pink: 337 100% 68%;
+    --vibrant-orange: 24 100% 62%;
+    --vibrant-cyan: 187 100% 52%;
+    --vibrant-lime: 86 100% 48%;
   }
 }
 
@@ -61,9 +68,9 @@
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', sans-serif;
     background-image:
-      radial-gradient(1200px 600px at 10% -10%, hsla(43, 74%, 49%, 0.12), transparent 60%),
-      radial-gradient(800px 500px at 90% 0%, hsla(0, 0%, 100%, 0.06), transparent 55%),
-      linear-gradient(180deg, hsl(0 0% 10%) 0%, hsl(0 0% 6%) 60%, hsl(0 0% 8%) 100%);
+      radial-gradient(circle at 20% 5%, hsla(var(--vibrant-pink), 0.15), transparent 42%),
+      radial-gradient(circle at 90% 10%, hsla(var(--vibrant-cyan), 0.14), transparent 48%),
+      linear-gradient(180deg, hsl(248 80% 14%) 0%, hsl(224 57% 15%) 35%, hsl(210 70% 20%) 70%, hsl(207 81% 27%) 100%);
     background-attachment: fixed;
   }
 
@@ -88,6 +95,12 @@
         hsl(var(--gold-dark)) 100%);
   }
 
+  .vibrant-pop {
+    background: linear-gradient(135deg, hsl(var(--vibrant-pink)) 0%, hsl(var(--vibrant-orange)) 45%, hsl(var(--vibrant-cyan)) 100%);
+    color: #fff;
+    box-shadow: 0 0 30px hsla(var(--vibrant-pink), 0.4);
+  }
+
   /* Floating gold glow button */
   .btn-gold-glow {
     @apply relative overflow-hidden transition-all duration-500;
@@ -107,9 +120,20 @@
   .glass-card {
     @apply backdrop-blur-xl;
     background: linear-gradient(135deg,
-        hsla(0, 0%, 10%, 0.8) 0%,
-        hsla(0, 0%, 6%, 0.9) 100%);
-    border: 1px solid hsla(43, 74%, 49%, 0.2);
+        hsla(271, 100%, 35%, 0.8) 0%,
+        hsla(320, 100%, 60%, 0.6) 35%,
+        hsla(195, 100%, 52%, 0.7) 100%);
+    border: 1px solid hsla(320, 96%, 70%, 0.3);
+  }
+
+  .bg-mural {
+    background: linear-gradient(135deg, #ff3e9f, #5f31ff 45%, #20c7ff 100%);
+    color: #ffffff;
+  }
+
+  .bg-mural-soft {
+    background: linear-gradient(135deg, rgba(255, 82, 165, 0.2), rgba(95, 49, 255, 0.25) 40%, rgba(32, 199, 255, 0.18) 100%);
+    color: #ffffff;
   }
 
   /* Diagonal clip */
@@ -135,8 +159,72 @@
   .border-gold-glow {
     border: 1px solid hsl(var(--gold-medium));
     box-shadow:
-      inset 0 0 20px hsla(43, 74%, 49%, 0.1),
-      0 0 20px hsla(43, 74%, 49%, 0.2);
+      inset 0 0 20px hsla(43, 74%, 49%, 0.25),
+      0 0 20px hsla(43, 74%, 49%, 0.25);
+  }
+
+  /* Gold accent line */
+  .gold-line {
+    background: linear-gradient(90deg, #ffe16a 0%, #f7b121 42%, #ffd662 100%);
+  }
+
+  /* Barber stripes */
+  .barber-stripes {
+    background: repeating-linear-gradient(-45deg,
+        #ffffff 0,
+        #ffffff 8px,
+        #e01f24 8px,
+        #e01f24 16px,
+        #0f5dc0 16px,
+        #0f5dc0 24px);
+    border-radius: 999px;
+    border: 1px solid hsl(var(--gold-medium));
+    box-shadow: 0 0 20px hsla(255, 255%, 255%, 0.2);
+    animation: barberStripeMove 4s linear infinite;
+    background-size: 260% 260%;
+  }
+
+  @keyframes barberStripeMove {
+    0% {
+      background-position: 0 0;
+    }
+
+    100% {
+      background-position: 220% 0;
+    }
+  }
+
+  @keyframes spinSlow {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .animate-spin-slow {
+    animation: spinSlow 4s linear infinite;
+  }
+
+  .barber-ribbon {
+    background: linear-gradient(120deg, #ffcd00, #d6952e 45%, #fff6d0 100%);
+    color: #2a1f0f;
+    border-radius: 999px;
+    font-weight: 700;
+    padding: 0.25rem 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  .mural-gold {
+    background: linear-gradient(135deg, #ffd85e, #f6b30a 50%, #f2d97f 100%);
+    color: #1f1f1f;
+    border-radius: 0.75rem;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid rgba(255, 214, 110, 0.4);
   }
 
   /* Floating animation */
