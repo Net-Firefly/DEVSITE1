@@ -51,22 +51,28 @@ const AdminDashboard = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('bookings');
+    const [dbStatus, setDbStatus] = useState<'connected' | 'offline' | 'unavailable'>('unavailable');
 
     // Form states
     const [newService, setNewService] = useState({ name: '', description: '', price: 0, duration: '30 min', category: 'Haircuts' });
     const [editingService, setEditingService] = useState<Service | null>(null);
 
-    const { isAuthenticated, user } = useAuth();
+    const { isAuthenticated, isLoading: authLoading, user } = useAuth();
     const navigate = useNavigate();
     const { toast } = useToast();
 
     useEffect(() => {
+        if (authLoading) {
+            return;
+        }
+
         if (!isAuthenticated || user?.role !== 'admin') {
             navigate('/login');
             return;
         }
+
         loadDashboardData();
-    }, [isAuthenticated, user?.role]);
+    }, [authLoading, isAuthenticated, user?.role]);
 
     const loadDashboardData = async () => {
         setLoading(true);
@@ -77,18 +83,30 @@ const AdminDashboard = () => {
                 'Content-Type': 'application/json',
             };
 
+            // DB/Health status from backend server
+            try {
+                const healthResp = await fetch(`${SERVER_BASE_URL}/health`);
+                if (healthResp.ok) {
+                    setDbStatus('connected');
+                } else {
+                    setDbStatus('offline');
+                }
+            } catch (error) {
+                setDbStatus('offline');
+            }
+
             // Fetch bookings from server-backed storage
             const bookingsRes = await fetch(`${SERVER_BASE_URL}/api/bookings`);
             const bookingsData = await bookingsRes.json();
             if (bookingsData.success) setBookings(bookingsData.bookings || []);
 
-            // Fetch users
-            const usersRes = await fetch(`${API_BASE_URL}/admin/users.php`, { headers });
+            // Fetch users from Node server
+            const usersRes = await fetch(`${SERVER_BASE_URL}/api/admin/users`, { headers });
             const usersData = await usersRes.json();
             if (usersData.success) setUsers(usersData.users || []);
 
-            // Fetch services
-            const servicesRes = await fetch(`${API_BASE_URL}/admin/services.php`, { headers });
+            // Fetch services from Node server
+            const servicesRes = await fetch(`${SERVER_BASE_URL}/api/admin/services`, { headers });
             const servicesData = await servicesRes.json();
             if (servicesData.success) setServices(servicesData.services || []);
         } catch (err) {
@@ -115,8 +133,13 @@ const AdminDashboard = () => {
 
         try {
             const token = localStorage.getItem('auth_token');
-            const response = await fetch(`${API_BASE_URL}/admin/services.php`, {
-                method: 'POST',
+            const method = editingService ? 'PUT' : 'POST';
+            const url = editingService
+                ? `${SERVER_BASE_URL}/api/admin/services/${editingService.id}`
+                : `${SERVER_BASE_URL}/api/admin/services`;
+
+            const response = await fetch(url, {
+                method,
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
@@ -126,25 +149,44 @@ const AdminDashboard = () => {
             const data = await response.json();
             if (data.success) {
                 toast({
-                    title: 'Service Added',
-                    description: 'New service has been added successfully.',
+                    title: editingService ? 'Service Updated' : 'Service Added',
+                    description: editingService
+                        ? 'Service details updated successfully.'
+                        : 'New service has been added successfully.',
                 });
                 setNewService({ name: '', description: '', price: 0, duration: '30 min', category: 'Haircuts' });
+                setEditingService(null);
                 loadDashboardData();
             } else {
                 toast({
                     title: 'Error',
-                    description: data.message || 'Failed to add service.',
+                    description: data.message || 'Failed to save service.',
                     variant: 'destructive',
                 });
             }
         } catch (err) {
             toast({
                 title: 'Error',
-                description: 'Failed to add service.',
+                description: 'Failed to save service.',
                 variant: 'destructive',
             });
         }
+    };
+
+    const editService = (service: Service) => {
+        setEditingService(service);
+        setNewService({
+            name: service.name,
+            description: service.description,
+            price: service.price,
+            duration: service.duration,
+            category: service.category,
+        });
+    };
+
+    const cancelEdit = () => {
+        setEditingService(null);
+        setNewService({ name: '', description: '', price: 0, duration: '30 min', category: 'Haircuts' });
     };
 
     const updateBookingStatus = async (orderId: string, status: string) => {
@@ -178,7 +220,7 @@ const AdminDashboard = () => {
         if (!window.confirm('Are you sure you want to delete this service?')) return;
         try {
             const token = localStorage.getItem('auth_token');
-            const response = await fetch(`${API_BASE_URL}/admin/services.php?id=${id}`, {
+            const response = await fetch(`${SERVER_BASE_URL}/api/admin/services/${id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -202,14 +244,54 @@ const AdminDashboard = () => {
         }
     };
 
+    if (authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="text-lg font-medium">Loading admin dashboard...</div>
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+                <p className="text-xl font-semibold text-foreground">You must be logged in as an admin to view this page.</p>
+                <button onClick={() => navigate('/login')} className="mt-3 rounded-md bg-primary px-4 py-2 text-white">Go to Login</button>
+            </div>
+        );
+    }
+
+    if (user?.role !== 'admin') {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+                <p className="text-xl font-semibold text-foreground">Access denied: Admins only.</p>
+                <button onClick={() => navigate('/')} className="mt-3 rounded-md bg-primary px-4 py-2 text-white">Go Home</button>
+            </div>
+        );
+    }
+
     return (
         <PageTransition>
             <div className="min-h-screen flex flex-col bg-background">
                 <Navigation />
                 <div className="flex-1 px-4 py-28 pt-32 container mx-auto">
                     <div className="mb-8">
-                        <h1 className="text-4xl font-bold text-foreground mb-2">Admin Dashboard</h1>
-                        <p className="text-muted-foreground">Manage all aspects of your business</p>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h1 className="text-4xl font-bold text-foreground mb-2">Admin Dashboard</h1>
+                                <p className="text-muted-foreground">Manage all aspects of your business</p>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-medium">
+                                <span className="px-2 py-1 rounded-full bg-slate-900/75 border border-slate-700 text-slate-200">DB:</span>
+                                {dbStatus === 'connected' ? (
+                                    <span className="px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400">Connected</span>
+                                ) : dbStatus === 'offline' ? (
+                                    <span className="px-2 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400">Offline</span>
+                                ) : (
+                                    <span className="px-2 py-1 rounded-full bg-slate-500/20 text-slate-200 border border-slate-400">Checking...</span>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                     {loading ? (
@@ -320,10 +402,18 @@ const AdminDashboard = () => {
                                                     placeholder="e.g., Haircuts"
                                                 />
                                             </div>
-                                            <Button onClick={addService} className="w-full">
-                                                <Plus className="w-4 h-4 mr-2" />
-                                                Add Service
-                                            </Button>
+                                            <div className="flex gap-2">
+                                                <Button onClick={addService} className="w-full">
+                                                    <Plus className="w-4 h-4 mr-2" />
+                                                    {editingService ? 'Save Changes' : 'Add Service'}
+                                                </Button>
+                                                {editingService && (
+                                                    <Button variant="secondary" onClick={cancelEdit} className="w-full">
+                                                        <X className="w-4 h-4 mr-2" />
+                                                        Cancel
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -343,13 +433,21 @@ const AdminDashboard = () => {
                                                             <p className="font-bold">{service.name}</p>
                                                             <p className="text-sm text-muted-foreground">KES {service.price} • {service.duration} • {service.category}</p>
                                                         </div>
-                                                        <Button
-                                                            variant="destructive"
-                                                            size="sm"
-                                                            onClick={() => deleteService(service.id)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={() => editService(service)}
+                                                            >
+                                                                <Edit2 className="w-4 h-4" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="destructive"
+                                                                size="sm"
+                                                                onClick={() => deleteService(service.id)}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
                                                     </Card>
                                                 ))
                                             )}

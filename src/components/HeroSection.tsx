@@ -5,21 +5,14 @@ const HeroSection = () => {
     <section className="relative min-h-screen overflow-hidden">
       {/* Barber shop vibe background */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />
-      <div className="absolute left-0 top-0 h-full w-9 barber-stripes opacity-90" />
-      <div className="absolute right-0 top-0 h-full w-9 barber-stripes opacity-90" />
+      <div className="absolute left-0 top-0 h-full w-2 barber-stripes opacity-90" />
+      <div className="absolute right-0 top-0 h-full w-2 barber-stripes opacity-90" />
       <div className="absolute inset-0 bg-black/35" />
 
       {/* Edge barber animated stripe accent */}
-      <div className="absolute left-0 top-0 h-12 w-10 barber-stripes opacity-90" />
-      <div className="absolute right-0 top-0 h-12 w-10 barber-stripes opacity-90" />
+      <div className="absolute left-0 top-0 h-12 w-2 barber-stripes opacity-90" />
+      <div className="absolute right-0 top-0 h-12 w-2 barber-stripes opacity-90" />
 
-      {/* Spinning barber pole */}
-      <div className="absolute top-20 right-8 z-20">
-        <div className="relative h-24 w-10 rounded-full overflow-hidden border border-yellow-300 shadow-lg animate-spin-slow bg-gradient-to-b from-white via-red-500 to-blue-500">
-          <div className="absolute inset-0 bg-[linear-gradient(120deg,#fff_0%,#fff_12.5%,#e01f24_12.5%,#e01f24_25%,#0f5dc0_25%,#0f5dc0_37.5%,#fff_37.5%,#fff_50%,#e01f24_50%,#e01f24_62.5%,#0f5dc0_62.5%,#0f5dc0_75%,#fff_75%,#fff_100%)]" />
-          <div className="absolute inset-0 bg-black/20 rounded-full" />
-        </div>
-      </div>
       <div
         className="absolute top-0 right-0 w-1/2 h-full opacity-20"
         style={{

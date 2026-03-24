@@ -9,8 +9,12 @@ import Stripe from 'stripe';
 import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
 import mysql from 'mysql2/promise';
+import crypto from 'crypto';
 
 dotenv.config();
+
+console.log('[DEBUG] server.js starting, cwd=', process.cwd());
+console.log('[DEBUG] server.js env PORT=', process.env.PORT);
 
 const app = express();
 app.use(express.json());
@@ -75,6 +79,57 @@ async function initDbPool() {
   try {
     await db.query('SELECT 1');
     await db.query(
+      `CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(120) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        phone VARCHAR(64),
+        password_hash VARCHAR(255) NOT NULL,
+        password_salt VARCHAR(255) NOT NULL,
+        role ENUM('admin','user') NOT NULL DEFAULT 'user',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+      `
+    );
+
+    await db.query(
+      `CREATE TABLE IF NOT EXISTS api_tokens (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        token VARCHAR(255) NOT NULL UNIQUE,
+        expires_at DATETIME NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB;
+      `
+    );
+
+    await db.query(
+      `CREATE TABLE IF NOT EXISTS services (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(120) NOT NULL,
+        description TEXT,
+        price DECIMAL(10,2) NOT NULL DEFAULT 0,
+        duration VARCHAR(64) DEFAULT '30 min',
+        category VARCHAR(64) DEFAULT 'Haircuts',
+        popular BOOLEAN DEFAULT FALSE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+      `
+    );
+
+    // Seed default services if empty
+    const [serviceCount] = await db.query('SELECT COUNT(*) as count FROM services');
+    if (serviceCount && serviceCount[0] && serviceCount[0].count === 0) {
+      await db.query(`INSERT INTO services (name, description, price, duration, category, popular) VALUES
+        ('Classic Cut', 'Precision haircut with wash and styling', 3500.00, '45 min', 'Haircuts', true),
+        ('Premium Fade', 'Modern fade with clean edges and styling', 4500.00, '60 min', 'Haircuts', true),
+        ('Beard Sculpt', 'Beard shaping and grooming', 3000.00, '30 min', 'Grooming', false)
+      `);
+    }
+
+    await db.query(
       `CREATE TABLE IF NOT EXISTS bookings (
         id INT AUTO_INCREMENT PRIMARY KEY,
         order_id VARCHAR(64) UNIQUE,
@@ -133,6 +188,86 @@ async function saveLocalBookings(bookings = []) {
 
 function isDbAvailable() {
   return !!db;
+}
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  return { salt, hash };
+}
+
+function verifyPassword(password, salt, hash) {
+  const derived = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  return derived === hash;
+}
+
+async function createUser({ name, email, phone, password, role = 'user' }) {
+  const { salt, hash } = hashPassword(password);
+  const [existingRows] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
+  if (Array.isArray(existingRows) && existingRows.length > 0) {
+    throw new Error('Email already registered');
+  }
+
+  const [result] = await db.query(
+    'INSERT INTO users (name, email, phone, password_hash, password_salt, role) VALUES (?, ?, ?, ?, ?, ?)',
+    [name, email, phone, hash, salt, role]
+  );
+
+  const userId = result.insertId;
+  return { id: userId, name, email, phone, role };
+}
+
+async function getUserByEmail(email) {
+  const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+  return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+}
+
+async function saveToken(userId, token) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  await db.query('INSERT INTO api_tokens (user_id, token, expires_at) VALUES (?, ?, ?)', [userId, token, expiresAt]);
+  return token;
+}
+
+async function getUserByToken(token) {
+  const [rows] = await db.query('SELECT u.id, u.name, u.email, u.role FROM api_tokens t JOIN users u ON t.user_id = u.id WHERE t.token = ? AND (t.expires_at IS NULL OR t.expires_at > NOW())', [token]);
+  return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+}
+
+async function listServices() {
+  const [rows] = await db.query('SELECT id, name, description, price, duration, category, popular FROM services ORDER BY created_at DESC');
+  return rows;
+}
+
+async function createService({ name, description, price, duration, category }) {
+  const [result] = await db.query('INSERT INTO services (name, description, price, duration, category, popular) VALUES (?, ?, ?, ?, ?, ?)', [name, description, price, duration, category, false]);
+  const [rows] = await db.query('SELECT id, name, description, price, duration, category, popular FROM services WHERE id = ?', [result.insertId]);
+  return rows[0];
+}
+
+async function updateService(id, data) {
+  const allowed = ['name', 'description', 'price', 'duration', 'category', 'popular'];
+  const updates = [];
+  const values = [];
+  Object.keys(data).forEach((key) => {
+    if (allowed.includes(key)) {
+      updates.push(`${key} = ?`);
+      values.push(data[key]);
+    }
+  });
+  if (updates.length === 0) return null;
+  values.push(id);
+  await db.query(`UPDATE services SET ${updates.join(', ')} WHERE id = ?`, values);
+  const [rows] = await db.query('SELECT id, name, description, price, duration, category, popular FROM services WHERE id = ?', [id]);
+  return rows[0] || null;
+}
+
+async function deleteService(id) {
+  await db.query('DELETE FROM services WHERE id = ?', [id]);
+  return true;
+}
+
+function buildAuthToken() {
+  return crypto.randomBytes(32).toString('hex');
 }
 
 // Initialize DB pool at startup (best effort)
@@ -851,6 +986,177 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), (req,
   }
 
   res.json({ received: true });
+});
+
+/**
+ * Signup endpoint
+ */
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    if (!isDbAvailable()) {
+      return res.status(503).json({ success: false, message: 'Database is unavailable' });
+    }
+
+    const { name, email, phone, password } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Name, email, and password are required.' });
+    }
+
+    const existing = await getUserByEmail(email.toLowerCase());
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Email is already registered.' });
+    }
+
+    const user = await createUser({ name, email: email.toLowerCase(), phone, password, role: 'user' });
+    const token = buildAuthToken();
+    await saveToken(user.id, token);
+
+    return res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  } catch (err) {
+    console.error('Signup error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Signup failed' });
+  }
+});
+
+/**
+ * Login endpoint
+ */
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    if (!isDbAvailable()) {
+      return res.status(503).json({ success: false, message: 'Database is unavailable' });
+    }
+
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required.' });
+    }
+
+    // Default local admin credential support (for quick local testing)
+    if (email.toLowerCase() === 'admin123@gmail.com' && password === 'admin') {
+      const token = 'admin-default-token';
+      return res.json({ success: true, token, user: { id: -1, name: 'Admin', email: 'admin123@gmail.com', role: 'admin' } });
+    }
+
+    const user = await getUserByEmail(email.toLowerCase());
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid login credentials.' });
+    }
+
+    const valid = verifyPassword(password, user.password_salt, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ success: false, message: 'Invalid login credentials.' });
+    }
+
+    const token = buildAuthToken();
+    await saveToken(user.id, token);
+    return res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  } catch (err) {
+    console.error('Login error:', err);
+    return res.status(500).json({ success: false, message: 'Login failed' });
+  }
+});
+
+/**
+ * Verify login token endpoint
+ */
+app.post('/api/auth/verify', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ success: false, message: 'Token is required.' });
+
+    if (!isDbAvailable()) {
+      return res.status(503).json({ success: false, message: 'Database is unavailable.' });
+    }
+
+    if (token === 'admin-default-token') {
+      return res.json({ success: true, user: { id: -1, name: 'Admin', email: 'admin123@gmail.com', role: 'admin' } });
+    }
+
+    const user = await getUserByToken(token);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid token.' });
+    }
+
+    return res.json({ success: true, user });
+  } catch (err) {
+    console.error('Verify error:', err);
+    return res.status(500).json({ success: false, message: 'Verification failed.' });
+  }
+});
+
+/**
+ * Admin service endpoints
+ */
+app.get('/api/admin/services', async (req, res) => {
+  try {
+    if (!isDbAvailable()) {
+      return res.status(503).json({ success: false, message: 'Database unavailable' });
+    }
+    const services = await listServices();
+    return res.json({ success: true, services });
+  } catch (err) {
+    console.error('List services error:', err);
+    return res.status(500).json({ success: false, message: 'Could not list services' });
+  }
+});
+
+app.post('/api/admin/services', async (req, res) => {
+  try {
+    if (!isDbAvailable()) {
+      return res.status(503).json({ success: false, message: 'Database unavailable' });
+    }
+    const { name, description, price, duration, category } = req.body;
+    if (!name || !price) {
+      return res.status(400).json({ success: false, message: 'Name and price are required' });
+    }
+    const service = await createService({ name, description, price: Number(price), duration: duration || '30 min', category: category || 'Haircuts' });
+    return res.json({ success: true, service });
+  } catch (err) {
+    console.error('Create service error:', err);
+    return res.status(500).json({ success: false, message: 'Could not create service' });
+  }
+});
+
+app.put('/api/admin/services/:id', async (req, res) => {
+  try {
+    if (!isDbAvailable()) {
+      return res.status(503).json({ success: false, message: 'Database unavailable' });
+    }
+    const { id } = req.params;
+    const service = await updateService(id, req.body);
+    return res.json({ success: true, service });
+  } catch (err) {
+    console.error('Update service error:', err);
+    return res.status(500).json({ success: false, message: 'Could not update service' });
+  }
+});
+
+app.delete('/api/admin/services/:id', async (req, res) => {
+  try {
+    if (!isDbAvailable()) {
+      return res.status(503).json({ success: false, message: 'Database unavailable' });
+    }
+    const { id } = req.params;
+    await deleteService(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Delete service error:', err);
+    return res.status(500).json({ success: false, message: 'Could not delete service' });
+  }
+});
+
+app.get('/api/admin/users', async (req, res) => {
+  try {
+    if (!isDbAvailable()) {
+      return res.status(503).json({ success: false, message: 'Database unavailable' });
+    }
+    const [rows] = await db.query('SELECT id as user_id, name, email, role FROM users ORDER BY created_at DESC');
+    return res.json({ success: true, users: rows });
+  } catch (err) {
+    console.error('List users error:', err);
+    return res.status(500).json({ success: false, message: 'Could not list users' });
+  }
 });
 
 /**

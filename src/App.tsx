@@ -18,6 +18,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import FloatingContact from "./components/FloatingContact";
 import KaiChatWidget from "./components/KaiChatWidget";
 import PageTransition from "./components/PageTransition";
+import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -74,14 +75,18 @@ const AnimatedRoutes = () => {
           </PageTransition>
         } />
         <Route path="/admin" element={
-          <PageTransition>
-            <AdminDashboard />
-          </PageTransition>
+          <ProtectedRoute adminOnly>
+            <PageTransition>
+              <AdminDashboard />
+            </PageTransition>
+          </ProtectedRoute>
         } />
         <Route path="/admin/bookings" element={
-          <PageTransition>
-            <AdminDashboard />
-          </PageTransition>
+          <ProtectedRoute adminOnly>
+            <PageTransition>
+              <AdminDashboard />
+            </PageTransition>
+          </ProtectedRoute>
         } />
         <Route path="*" element={<NotFound />} />
       </Routes>

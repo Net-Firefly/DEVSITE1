@@ -98,7 +98,7 @@ const Index = () => {
 
             <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12">
-                <div className="relative rounded-2xl overflow-hidden aspect-video glass-card shadow-2xl border border-gold-light/40">
+                <div className="relative rounded-2xl overflow-hidden h-[360px] md:h-[420px] glass-card shadow-2xl border border-gold-light/40">
                   <video
                     ref={videoRef}
                     src="/promo.mp4"
@@ -106,6 +106,7 @@ const Index = () => {
                     className="absolute inset-0 w-full h-full object-cover"
                     title="Tripple Kay Cutts and Spa Promo"
                     poster="/gallery/_DSC0005%20(2).jpg"
+                    style={{ maxHeight: '100%' }}
                   >
                     Sorry, your browser does not support embedded videos.
                   </video>

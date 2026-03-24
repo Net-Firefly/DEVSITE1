@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Navigation from "../components/Navigation";
 import Footer from "../components/Footer";
 import { motion } from "framer-motion";
+import { SERVER_BASE_URL } from "@/lib/api";
 
 const QUESTIONS = [
     { q: "How often should you get a professional haircut to maintain shape?", a: ["Every week", "Every 4-6 weeks", "Every 6 months"], correct: 1 },
@@ -103,7 +104,7 @@ const Quiz = () => {
         if (!claimEmail || !claimName) return;
         const payload = { name: claimName, email: claimEmail, prize: prize?.text || null, score: score(), date: new Date().toISOString() };
         try {
-            const res = await fetch('/api/quiz-claim', {
+            const res = await fetch(`${SERVER_BASE_URL}/api/quiz-claim`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),

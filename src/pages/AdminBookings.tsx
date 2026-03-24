@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import PageTransition from '@/components/PageTransition';
 import { Table } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { SERVER_BASE_URL } from '@/lib/api';
 
 const AdminBookings = () => {
     const [bookings, setBookings] = useState<any[]>([]);
@@ -10,7 +11,7 @@ const AdminBookings = () => {
     const fetchBookings = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/bookings');
+            const res = await fetch(`${SERVER_BASE_URL}/api/bookings`);
             const data = await res.json();
             if (data.success) setBookings(data.bookings);
         } catch (err) {
@@ -26,7 +27,7 @@ const AdminBookings = () => {
 
     const markPaid = async (orderId: string) => {
         try {
-            const res = await fetch(`/api/bookings/${orderId}/mark-paid`, { method: 'POST' });
+            const res = await fetch(`${SERVER_BASE_URL}/api/bookings/${orderId}/mark-paid`, { method: 'POST' });
             const data = await res.json();
             if (data.success) fetchBookings();
         } catch (err) {
